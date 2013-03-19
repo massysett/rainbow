@@ -17,12 +17,6 @@ module System.Console.Rainbow (
   , chunkWidth
   , printChunks
 
-  -- * Effects
-  , Bold(Bold, unBold)
-  , Underline(Underline, unUnderline)
-  , Flash(Flash, unFlash)
-  , Inverse(Inverse, unInverse)
-
   -- * Style and TextSpec
 
   -- | A style is a bundle of attributes that describes text
@@ -727,21 +721,6 @@ defaultColors term =
   fromMaybe mempty (T.getCapability term T.restoreDefaultColors)
 
 --
--- Effects
---
-newtype Bold = Bold { unBold :: Bool }
-  deriving (Show, Eq, Ord)
-
-newtype Underline = Underline { unUnderline :: Bool }
-  deriving (Show, Eq, Ord)
-
-newtype Flash = Flash { unFlash :: Bool }
-  deriving (Show, Eq, Ord)
-
-newtype Inverse = Inverse { unInverse :: Bool }
-  deriving (Show, Eq, Ord)
-
---
 -- Styles
 --
 
@@ -750,10 +729,10 @@ newtype Inverse = Inverse { unInverse :: Bool }
 -- 256 color terminals, so that the text appearance can change
 -- depending on how many colors a terminal has.
 data StyleCommon = StyleCommon
-  { bold :: Bold
-  , underline :: Underline
-  , flash :: Flash
-  , inverse :: Inverse
+  { bold :: Bool
+  , underline :: Bool
+  , flash :: Bool
+  , inverse :: Bool
   } deriving (Show, Eq, Ord)
 
 -- | Describes text appearance (foreground and background colors, as
@@ -775,10 +754,10 @@ data Style256 = Style256
 -- | Has all bold, flash, underline, and inverse turned off.
 defaultStyleCommon :: StyleCommon
 defaultStyleCommon = StyleCommon
-  { bold = Bold False
-  , underline = Underline False
-  , flash = Flash False
-  , inverse = Inverse False
+  { bold = False
+  , underline = False
+  , flash = False
+  , inverse = False
   }
 
 -- | Uses the default terminal colors (which will vary depending on
@@ -826,11 +805,11 @@ commonAttrs :: T.Terminal -> StyleCommon -> T.TermOutput
 commonAttrs t s =
   let a = T.Attributes
         { T.standoutAttr = False
-        , T.underlineAttr = unUnderline . underline $ s
-        , T.reverseAttr = unInverse . inverse $ s
-        , T.blinkAttr = unFlash . flash $ s
+        , T.underlineAttr = underline s
+        , T.reverseAttr = inverse s
+        , T.blinkAttr = flash s
         , T.dimAttr = False
-        , T.boldAttr = unBold . bold $ s
+        , T.boldAttr = bold s
         , T.invisibleAttr = False
         , T.protectedAttr = False
         }
