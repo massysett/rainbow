@@ -31,6 +31,10 @@ module System.Console.Rainbow (
   , TextSpec (TextSpec, style8, style256)
   , defaultTextSpec
 
+  -- * Color switchers
+  , switchForeground
+  , switchBackground
+
    -- * Specific colors
    -- * 8 color foreground colors
   , color8_f_default
@@ -796,6 +800,28 @@ defaultTextSpec = TextSpec
   { style8 = defaultStyle8
   , style256 = defaultStyle256
   }
+
+-- | Switch the foreground colors for new ones.
+switchForeground
+  :: Foreground8
+  -> Foreground256
+  -> TextSpec
+  -> TextSpec
+switchForeground c8 c256 ts = ts' where
+  ts' = TextSpec s8' s256'
+  s8' = (style8 ts) { foreground8 = c8 }
+  s256' = (style256 ts) { foreground256 = c256 }
+
+-- | Switch the background colors for new ones.
+switchBackground
+  :: Background8
+  -> Background256
+  -> TextSpec
+  -> TextSpec
+switchBackground c8 c256 ts = ts' where
+  ts' = TextSpec s8' s256'
+  s8' = (style8 ts) { background8 = c8 }
+  s256' = (style256 ts) { background256 = c256 }
 
 --
 -- Internal
