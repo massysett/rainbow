@@ -2,6 +2,30 @@
 -- module uses the Haskell terminfo library, which links against the
 -- UNIX library of the same name, so it should work with a wide
 -- variety of UNIX terminals.
+--
+-- The building block of Rainbow is the 'Chunk'. Each Chunk comes with
+-- a 'TextSpec', which specifies how the text should look on 8-color
+-- and on 256-color terminals. The Chunk is a full specification; that
+-- is, although Chunks are typically printed one after the other, the
+-- appearance of one Chunk does not affect the appearance of the next
+-- Chunk.
+--
+-- You have full freedom to specify different attributes and colors
+-- for 8 and 256 color terminals; for instance, you can have text
+-- appear red on an 8-color terminal but blue on a 256-color terminal.
+--
+-- Some useful combinators are provided to assist with the building of
+-- Chunks. 'plain' builds a Chunk with a provided 'Text' that is
+-- rendered using the terminal's default settings and colors. You then
+-- use '.+.' to combine different modifiers to change how the Chunk is
+-- rendered. Here's an example:
+--
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- > blueHello :: Chunk
+-- > blueHello = plain "Hello world!" .+. color8_f_blue .+. color8_b_white
+-- >             .+. color256_f_blue .+. color256_b_blue
+-- >             .+. underline8 .+. underline256
+
 module System.Console.Rainbow (
   -- * Colors
     Term(..)
@@ -13,15 +37,46 @@ module System.Console.Rainbow (
   -- * Chunks
   , Chunk (chunkTextSpec, chunkText)
   , chunk
+  , plain
   , Width(Width, unWidth)
   , chunkWidth
   , printChunks
 
+  -- * Mod
+  , Mod(..)
+  , ChangeText(..)
+  , (.+.)
+
   -- * Effects
-  , Bold(Bold, unBold)
-  , Underline(Underline, unUnderline)
-  , Flash(Flash, unFlash)
-  , Inverse(Inverse, unInverse)
+  , Bold (Bold, unBold)
+  , Underline (Underline, unUnderline)
+  , Flash (Flash, unFlash)
+  , Inverse (Inverse, unInverse)
+
+  , Bold8 (Bold8, unBold8)
+  , bold8, bold8off
+
+  , Underline8 (Underline8, unUnderline8)
+  , underline8, underline8off
+
+  , Flash8 (Flash8, unFlash8)
+  , flash8, flash8off
+
+  , Inverse8 (Inverse8, unInverse8)
+  , inverse8, inverse8off
+
+  , Bold256 (Bold256, unBold256)
+  , bold256, bold256off
+
+  , Underline256 (Underline256, unUnderline256)
+  , underline256, underline256off
+
+  , Flash256 (Flash256, unFlash256)
+  , flash256, flash256off
+
+  , Inverse256 (Inverse256, unInverse256)
+  , inverse256, inverse256off
+
 
   -- * Style and TextSpec
 
@@ -42,7 +97,7 @@ module System.Console.Rainbow (
   , switchBackground
 
    -- * Specific colors
-   -- * 8 color foreground colors
+   -- ** 8 color foreground colors
   , color8_f_default
   , color8_f_black
   , color8_f_red
@@ -64,7 +119,10 @@ module System.Console.Rainbow (
   , color8_b_cyan
   , color8_b_white
 
-   -- * 256 color foreground colors
+   -- ** 256 color foreground colors
+
+   -- | The color names assume a palette similar to the default one
+   -- that xterm uses.
   , color256_f_default
   , color256_f_0
   , color256_f_black
@@ -340,6 +398,9 @@ module System.Console.Rainbow (
   , color256_f_255
 
   -- ** 256 color background colors
+
+   -- | The color names assume a palette similar to the default one
+   -- that xterm uses.
   , color256_b_default
   , color256_b_0
   , color256_b_black
@@ -645,6 +706,25 @@ data Term
   deriving (Eq, Show)
 
 
+--
+-- Mod
+--
+
+class Mod a where
+  changeChunk :: Chunk -> a -> Chunk
+
+instance Mod Text where
+  changeChunk (Chunk ts _) t' = Chunk ts t'
+
+newtype ChangeText = ChangeText { unChangeText :: Text -> Text }
+
+instance Mod ChangeText where
+  changeChunk (Chunk ts t) (ChangeText f) = Chunk ts (f t)
+
+(.+.) :: Mod a => Chunk -> a -> Chunk
+(.+.) = changeChunk
+infixl 6 .+.
+
 -- For Background8, Background256, Foreground8, Foreground256: the
 -- newtype wraps a Terminfo Color. If Nothing, use the default color.
 
@@ -652,17 +732,33 @@ data Term
 newtype Background8 = Background8 { unBackground8 :: Maybe T.Color }
   deriving (Eq, Show, Ord)
 
+instance Mod Background8 where
+  changeChunk (Chunk ts t) b8 =
+    Chunk (ts { style8 = (style8 ts) { background8 = b8 } } ) t
+
 -- | Background color in a 256 color setting.
 newtype Background256 = Background256 { unBackground256 :: Maybe T.Color }
   deriving (Eq, Show, Ord)
+
+instance Mod Background256 where
+  changeChunk (Chunk ts t) b256 =
+    Chunk (ts { style256 = (style256 ts) { background256 = b256 } } ) t
 
 -- | Foreground color in an 8 color setting.
 newtype Foreground8 = Foreground8 { unForeground8 :: Maybe T.Color }
   deriving (Eq, Show, Ord)
 
+instance Mod Foreground8 where
+  changeChunk (Chunk ts t) f8 =
+    Chunk (ts { style8 = (style8 ts) { foreground8 = f8 } } ) t
+
 -- | Foreground color in a 256 color setting.
 newtype Foreground256 = Foreground256 { unForeground256 :: Maybe T.Color }
   deriving (Eq, Show, Ord)
+
+instance Mod Foreground256 where
+  changeChunk (Chunk ts t) f256 =
+    Chunk (ts { style256 = (style256 ts) { foreground256 = f256 } } ) t
 
 
 --
@@ -688,6 +784,10 @@ data Chunk = Chunk
 -- | Makes new Chunks.
 chunk :: TextSpec -> Text -> Chunk
 chunk = Chunk
+
+-- | Makes a plain Chunk; that is, one with a defaultTextSpec.
+plain :: Text -> Chunk
+plain = chunk defaultTextSpec
 
 -- | How wide the text of a chunk is.
 newtype Width = Width { unWidth :: Int }
@@ -744,6 +844,135 @@ newtype Flash = Flash { unFlash :: Bool }
 
 newtype Inverse = Inverse { unInverse :: Bool }
   deriving (Show, Eq, Ord)
+
+newtype Bold8 = Bold8 { unBold8 :: Bold }
+  deriving (Show, Eq, Ord)
+
+bold8 :: Bold8
+bold8 = Bold8 (Bold True)
+
+bold8off :: Bold8
+bold8off = Bold8 (Bold False)
+
+instance Mod Bold8 where
+  changeChunk (Chunk ts t) (Bold8 b) =
+    let c8 = common8 . style8 $ ts
+        c8' = c8 { bold = b }
+        ts' = ts { style8 = (style8 ts) { common8 = c8' } }
+    in Chunk ts' t
+
+newtype Underline8 = Underline8 { unUnderline8 :: Underline }
+  deriving (Show, Eq, Ord)
+
+underline8 :: Underline8
+underline8 = Underline8 (Underline True)
+
+underline8off :: Underline8
+underline8off = Underline8 (Underline False)
+
+instance Mod Underline8 where
+  changeChunk (Chunk ts t) (Underline8 u) =
+    let c8 = common8 . style8 $ ts
+        c8' = c8 { underline = u }
+        ts' = ts { style8 = (style8 ts) { common8 = c8' } }
+    in Chunk ts' t
+
+newtype Flash8 = Flash8 { unFlash8 :: Flash }
+  deriving (Show, Eq, Ord)
+
+flash8 :: Flash8
+flash8 = Flash8 (Flash True)
+
+flash8off :: Flash8
+flash8off = Flash8 (Flash False)
+
+instance Mod Flash8 where
+  changeChunk (Chunk ts t) (Flash8 f) =
+    let c8 = common8 . style8 $ ts
+        c8' = c8 { flash = f }
+        ts' = ts { style8 = (style8 ts) { common8 = c8' } }
+    in Chunk ts' t
+
+newtype Inverse8 = Inverse8 { unInverse8 :: Inverse }
+  deriving (Show, Eq, Ord)
+
+inverse8 :: Inverse8
+inverse8 = Inverse8 (Inverse True)
+
+inverse8off :: Inverse8
+inverse8off = Inverse8 (Inverse False)
+
+instance Mod Inverse8 where
+  changeChunk (Chunk ts t) (Inverse8 i) =
+    let c8 = common8 . style8 $ ts
+        c8' = c8 { inverse = i }
+        ts' = ts { style8 = (style8 ts) { common8 = c8' } }
+    in Chunk ts' t
+
+newtype Bold256 = Bold256 { unBold256 :: Bold }
+  deriving (Show, Eq, Ord)
+
+bold256 :: Bold256
+bold256 = Bold256 (Bold True)
+
+bold256off :: Bold256
+bold256off = Bold256 (Bold False)
+
+instance Mod Bold256 where
+  changeChunk (Chunk ts t) (Bold256 b) =
+    let c256 = common256 . style256 $ ts
+        c256' = c256 { bold = b }
+        ts' = ts { style256 = (style256 ts) { common256 = c256' } }
+    in Chunk ts' t
+
+newtype Underline256 = Underline256 { unUnderline256 :: Underline }
+  deriving (Show, Eq, Ord)
+
+underline256 :: Underline256
+underline256 = Underline256 (Underline True)
+
+underline256off :: Underline256
+underline256off = Underline256 (Underline False)
+
+instance Mod Underline256 where
+  changeChunk (Chunk ts t) (Underline256 u) =
+    let c256 = common256 . style256 $ ts
+        c256' = c256 { underline = u }
+        ts' = ts { style256 = (style256 ts) { common256 = c256' } }
+    in Chunk ts' t
+
+newtype Flash256 = Flash256 { unFlash256 :: Flash }
+  deriving (Show, Eq, Ord)
+
+flash256 :: Flash256
+flash256 = Flash256 (Flash True)
+
+flash256off :: Flash256
+flash256off = Flash256 (Flash False)
+
+instance Mod Flash256 where
+  changeChunk (Chunk ts t) (Flash256 f) =
+    let c256 = common256 . style256 $ ts
+        c256' = c256 { flash = f }
+        ts' = ts { style256 = (style256 ts) { common256 = c256' } }
+    in Chunk ts' t
+
+newtype Inverse256 = Inverse256 { unInverse256 :: Inverse }
+  deriving (Show, Eq, Ord)
+
+inverse256 :: Inverse256
+inverse256 = Inverse256 (Inverse True)
+
+inverse256off :: Inverse256
+inverse256off = Inverse256 (Inverse False)
+
+instance Mod Inverse256 where
+  changeChunk (Chunk ts t) (Inverse256 i) =
+    let c256 = common256 . style256 $ ts
+        c256' = c256 { inverse = i }
+        ts' = ts { style256 = (style256 ts) { common256 = c256' } }
+    in Chunk ts' t
+
 
 --
 -- Styles
