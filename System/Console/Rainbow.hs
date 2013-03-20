@@ -17,28 +17,49 @@
 -- Some useful combinators are provided to assist with the building of
 -- Chunks. 'plain' builds a Chunk with a provided 'Text' that is
 -- rendered using the terminal's default settings and colors. You then
--- use '.+.' to combine different modifiers to change how the Chunk is
+-- use '+.+' to combine different modifiers to change how the Chunk is
 -- rendered. Here's an example:
 --
 -- > {-# LANGUAGE OverloadedStrings #-}
+-- >
+-- > -- This chunk is blue and underlined, both on 8-color and 256-color
+-- > -- terminals.
 -- > blueHello :: Chunk
--- > blueHello = plain "Hello world!" +.+ color8_f_blue +.+ color8_b_white
--- >             +.+ color256_f_blue +.+ color256_b_blue
--- >             +.+ underline8 +.+ underline256
+-- > blueHello = plain "Hello world!" +.+ f_blue +.+ underline
+-- >
+-- > -- This chunk is red on 8-color terminals but uses color 88 on
+-- > -- 256-color terminals. Because +.+ is left-associative, the
+-- > -- color256_f_88 supersedes the f_red, which sets the foreground
+-- > -- on both 8 and 256 color terminals to red.
+-- > redHello :: Chunk
+-- > redHello = plain "Hello world!" +.+ f_red +.+ color256_f_88
+-- >
+-- > -- This chunk is underlined on 8-color terminals but is not
+-- > -- underlined on 256-color terminals.
+-- > underlinedOn8 :: Chunk
+-- > underlinedOn8 = plain "Hello world!" +.+ underline8
+-- >
+-- > newline :: Chunk
+-- > newline = plain "\n"
+-- >
+-- > -- How to print all these chunks
+-- > main :: IO ()
+-- > main = do
+-- >   t <- termFromEnv
+-- >   printChunks t [blueHello, nl, redHello, nl, underlinedOn8, nl]
+
 
 module System.Console.Rainbow (
-  -- * Colors
+
+  -- * Terminal definitions
     Term(..)
-  , Background8
-  , Background256
-  , Foreground8
-  , Foreground256
+  , termFromEnv
 
   -- * Chunks
-  , Chunk (..)
+  , Chunk
   , plain
-  , Width(Width, unWidth)
-  , chunkWidth
+
+  -- * Printing chunks
   , printChunks
   , hPrintChunks
 
@@ -48,49 +69,66 @@ module System.Console.Rainbow (
   , (.+.)
   , (+.+)
 
-  -- * Effects
-  , Bold (Bold, unBold)
-  , Underline (Underline, unUnderline)
-  , Flash (Flash, unFlash)
-  , Inverse (Inverse, unInverse)
+  -- * Effects for both 8 and 256 color terminals
 
-  , Bold8 (Bold8, unBold8)
-  , bold8, bold8off
+  -- | These modifiers affect both 8 and 256 color terminals:
+  --
+  -- > {-# LANGUAGE OverloadedStrings #-}
+  -- > underlinedOn8and256 :: Chunk
+  -- > underlinedOn8and256 = plain "Underlined!" +.+ underline
+  --
+  -- There are also modifiers to turn an effect off, such as
+  -- 'boldOff'. Ordinarily you will not need these because each chunk
+  -- starts with no effects, so you only need to turn on the effects
+  -- you want. However the @off@ modifiers are here if you need them.
 
-  , Underline8 (Underline8, unUnderline8)
-  , underline8, underline8off
-
-  , Flash8 (Flash8, unFlash8)
-  , flash8, flash8off
-
-  , Inverse8 (Inverse8, unInverse8)
-  , inverse8, inverse8off
-
-  , Bold256 (Bold256, unBold256)
-  , bold256, bold256off
-
-  , Underline256 (Underline256, unUnderline256)
-  , underline256, underline256off
-
-  , Flash256 (Flash256, unFlash256)
-  , flash256, flash256off
-
-  , Inverse256 (Inverse256, unInverse256)
-  , inverse256, inverse256off
-
-  , BoldAll(..)
   , bold, boldOff
-
-  , UnderlineAll(..)
   , underline, underlineOff
-
-  , FlashAll(..)
   , flash, flashOff
-
-  , InverseAll(..)
   , inverse, inverseOff
 
-  , ForegroundAll (..)
+  -- * Effects for 8-color terminals only
+
+  -- | These modifiers affect 8-color terminals only. For instance
+  -- this appears bold only on an 8-color terminal:
+  --
+  -- > {-# LANGUAGE OverloadedStrings #-}
+  -- > boldOn8 :: Chunk
+  -- > boldOn8 = plain "Bold on 8 color terminal only" +.+ bold8
+
+  , bold8, bold8off
+  , underline8, underline8off
+  , flash8, flash8off
+  , inverse8, inverse8off
+
+  -- * Effects for 256-color terminals only
+
+  -- | These modifiers affect 256-color terminals only. For instance,
+  -- this text is underlined on 256 color terminals but is bold on
+  -- 8-color terminals:
+  --
+  -- > {-# LANGUAGE OverloadedStrings #-}
+  -- > underlinedOn256 :: Chunk
+  -- > underlinedOn256 = plain "Underlined on 256 color terminal"
+  -- >                 +.+ underlined256 +.+ bold8
+
+  , bold256, bold256off
+  , underline256, underline256off
+  , flash256, flash256off
+  , inverse256, inverse256off
+
+  -- * Colors for both 8 and 256 color terminals
+
+  -- | These color modifiers affect both 8 and 256 color
+  -- terminals. For example, to print something in red on blue on both
+  -- an 8 and a 256 color terminal:
+  --
+  -- > {-# LANGUAGE OverloadedStrings #-}
+  -- > redHello :: Chunk
+  -- > redHello = plain "Hello world!" +.+ f_red +.+ b_blue
+
+  -- ** Foreground colors
+
   , f_default
   , f_black
   , f_red
@@ -101,7 +139,8 @@ module System.Console.Rainbow (
   , f_cyan
   , f_white
 
-  , BackgroundAll (..)
+  -- ** Background colors
+
   , b_default
   , b_black
   , b_red
@@ -111,25 +150,6 @@ module System.Console.Rainbow (
   , b_magenta
   , b_cyan
   , b_white
-
-
-  -- * Style and TextSpec
-
-  -- | A style is a bundle of attributes that describes text
-  -- attributes, such as its color and whether it is bold.
-  , StyleCommon (StyleCommon, scBold, scUnderline, scFlash, scInverse)
-  , Style8 (Style8, foreground8, background8, common8)
-  , Style256 (Style256, foreground256, background256, common256)
-  , defaultStyleCommon
-  , defaultStyle8
-  , defaultStyle256
-
-  , TextSpec (TextSpec, style8, style256)
-  , defaultTextSpec
-
-  -- * Color switchers
-  , switchForeground
-  , switchBackground
 
    -- * Specific colors
    -- ** 8 color foreground colors
@@ -710,18 +730,87 @@ module System.Console.Rainbow (
   , color256_b_254
   , color256_b_255
 
+  -- * Create your own colors
+
+  -- * Style, TextSpec, and Chunk innards
+
+  -- | A style is a bundle of attributes that describes text
+  -- attributes, such as its color and whether it is bold.
+  --
+  -- Ordinarily you shouldn't need to use these types but they are
+  -- here in case they are useful; in particular, you can use them to
+  -- examine a Chunk's TextSpec to see what its characteristics are.
+  , StyleCommon (StyleCommon, scBold, scUnderline, scFlash, scInverse)
+  , Style8 (Style8, foreground8, background8, common8)
+  , Style256 (Style256, foreground256, background256, common256)
+  , defaultStyleCommon
+  , defaultStyle8
+  , defaultStyle256
+
+  , TextSpec (TextSpec, style8, style256)
+  , defaultTextSpec
+
+  , chunkTextSpec
+  , chunkText
+
+  -- * Basement
+
+  -- | Ordinarily you will not need the things down here. Instead, the
+  -- definitions above will give you an instance of Mod that will
+  -- create the effect or color you need.
+
+  -- ** Modifier newtype wrappers
+
+  , Bold8 (Bold8, unBold8)
+  , Underline8 (Underline8, unUnderline8)
+  , Flash8 (Flash8, unFlash8)
+  , Inverse8 (Inverse8, unInverse8)
+
+  , Bold256 (Bold256, unBold256)
+  , Underline256 (Underline256, unUnderline256)
+  , Flash256 (Flash256, unFlash256)
+  , Inverse256 (Inverse256, unInverse256)
+
+  , BoldAll(..)
+  , UnderlineAll(..)
+  , FlashAll(..)
+  , InverseAll(..)
+
+  , ForegroundAll (..)
+  , BackgroundAll (..)
+
+  -- ** Wrappers for effects
+
+  , Bold (Bold, unBold)
+  , Underline (Underline, unUnderline)
+  , Flash (Flash, unFlash)
+  , Inverse (Inverse, unInverse)
+
+  -- ** Wrappers for colors
+
+  -- | Definitions are provided above that give you every possible
+  -- color; however, these constructors are exported in case you want
+  -- to make your own colors instead. Use at your own risk, as you can
+  -- create non-sensical colors with this (such as 256-color colors in
+  -- a 'Background8'.)
+  , Background8 (..)
+  , Background256 (..)
+  , Foreground8 (..)
+  , Foreground256 (..)
+
   ) where
 
 
-import Data.Monoid (Monoid, mempty, mappend, mconcat)
+import Data.Monoid (Monoid, mempty, mconcat)
 import Data.Text (Text)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as X
 import qualified System.Console.Terminfo as T
 import System.IO as IO
+import System.Environment as Env
 
 --
--- Colors
+-- Terminal definitions
 --
 
 -- | Which terminal definition to use.
@@ -741,6 +830,13 @@ data Term
   -- used. Otherwise, no colors are used.
   deriving (Eq, Show)
 
+-- | Gets the terminal definition from the environment. If the
+-- environment does not have a TERM veriable, use 'Dumb'.
+termFromEnv :: IO Term
+termFromEnv = do
+  t <- Env.lookupEnv "TERM"
+  return $ maybe Dumb TermName t
+
 
 --
 -- Mod
@@ -748,13 +844,27 @@ data Term
 
 -- | A Mod is anything capable of modifying a Chunk. Usually these
 -- will modify the TextSpec, though a few Mod instead modify the Text
--- itself.
+-- itself. Typically you will create a Chunk with 'plain' and then use
+-- '+.+' repeatedly to modify the Chunk to suit your needs.
 class Mod a where
   changeChunk :: Chunk -> a -> Chunk
 
+-- | When used as a modifier, a Text will replace the text within a
+-- Chunk with new text.
+--
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- > goodbyeWorld :: Chunk
+-- > goodbyeWorld = plain "Hello world!" +.+ "Goodbye world!"
 instance Mod Text where
   changeChunk (Chunk ts _) t' = Chunk ts t'
 
+-- | Useful if you want to inspect the text in a Chunk and then build
+-- a new Chunk with different text.
+--
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- > import Data.Text (append)
+-- > helloDolly :: Chunk
+-- > helloDolly = plain "Hello" +.+ ChangeText (`append` " Dolly")
 newtype ChangeText = ChangeText { unChangeText :: Text -> Text }
 
 instance Mod ChangeText where
@@ -766,7 +876,14 @@ instance Mod ChangeText where
 infixl 6 .+.
 
 -- | Composes modifiers. Useful to build up a single function that
--- modifies a Chunk.
+-- modifies a Chunk. You might use this to build up several modifiers
+-- and use them repeatedly, or you might write an API that expects
+-- functions of type @Chunk -> Chunk@ and then you could use '.+.' to
+-- build those functions. Left associative.
+--
+-- > redBoldUnderline :: Chunk -> Chunk
+-- > redBoldUnderline = id .+. f_red .+. bold .+. underline
+
 (.+.) :: Mod a => (Chunk -> Chunk) -> a -> Chunk -> Chunk
 (.+.) f a c = changeChunk (f c) a
 infixl 6 +.+
@@ -807,7 +924,6 @@ instance Mod Foreground256 where
     Chunk (ts { style256 = (style256 ts) { foreground256 = f256 } } ) t
 
 
-
 --
 -- Chunks
 --
@@ -828,24 +944,17 @@ data Chunk = Chunk
   , chunkText :: Text
   } deriving (Eq, Show, Ord)
 
--- | Makes a plain Chunk; that is, one with a defaultTextSpec.
+-- | Makes a plain Chunk; that is, one that has no effects and is
+-- printed in the default foreground and background color for the
+-- terminal. Modify this chunk so that it has the colors and effects
+-- that you want.
 plain :: Text -> Chunk
 plain = Chunk defaultTextSpec
 
--- | How wide the text of a chunk is.
-newtype Width = Width { unWidth :: Int }
-                deriving (Show, Eq, Ord)
-
-instance Monoid Width where
-  mempty = Width 0
-  mappend (Width w1) (Width w2) = Width $ w1 + w2
-
-chunkWidth :: Chunk -> Width
-chunkWidth (Chunk _ t) = Width . X.length $ t
-
 -- | Sends a list of chunks to the given handle for printing. Sets up
 -- the terminal (this only needs to be done once.) Lazily processes
--- the list of Chunk.
+-- the list of Chunk. See 'printChunks' for notes on how many colors
+-- are used.
 hPrintChunks :: IO.Handle -> Term -> [Chunk] -> IO ()
 hPrintChunks h t cs = do
   let setup = case t of
@@ -863,6 +972,15 @@ hPrintChunks h t cs = do
 -- | Sends a list of chunks to standard output for printing. Sets up
 -- the terminal (this only needs to be done once.) Lazily processes
 -- the list of Chunk.
+--
+-- Which colors are used depends upon the 'Term'. If it is 'Dumb',
+-- then no colors are used on output. If the 'Term' is specified with
+-- 'TermName', the UNIX terminfo library is used to determine how many
+-- colors the terminal supports. If it supports at least 256 colors,
+-- then 256 colors are used. If it supports at least 8 colors but less
+-- than 256 colors, then 256 colors are used. Otherwise, no colors are
+-- used. A runtime error will occur if the 'TermName' is not found in
+-- the system terminal database.
 printChunks :: Term -> [Chunk] -> IO ()
 printChunks = hPrintChunks IO.stdout
 
@@ -1247,28 +1365,6 @@ defaultTextSpec = TextSpec
   { style8 = defaultStyle8
   , style256 = defaultStyle256
   }
-
--- | Switch the foreground colors for new ones.
-switchForeground
-  :: Foreground8
-  -> Foreground256
-  -> TextSpec
-  -> TextSpec
-switchForeground c8 c256 ts = ts' where
-  ts' = TextSpec s8' s256'
-  s8' = (style8 ts) { foreground8 = c8 }
-  s256' = (style256 ts) { foreground256 = c256 }
-
--- | Switch the background colors for new ones.
-switchBackground
-  :: Background8
-  -> Background256
-  -> TextSpec
-  -> TextSpec
-switchBackground c8 c256 ts = ts' where
-  ts' = TextSpec s8' s256'
-  s8' = (style8 ts) { background8 = c8 }
-  s256' = (style256 ts) { background256 = c256 }
 
 --
 -- Internal
