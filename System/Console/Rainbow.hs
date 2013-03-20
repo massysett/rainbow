@@ -22,9 +22,9 @@
 --
 -- > {-# LANGUAGE OverloadedStrings #-}
 -- > blueHello :: Chunk
--- > blueHello = plain "Hello world!" .+. color8_f_blue .+. color8_b_white
--- >             .+. color256_f_blue .+. color256_b_blue
--- >             .+. underline8 .+. underline256
+-- > blueHello = plain "Hello world!" +.+ color8_f_blue +.+ color8_b_white
+-- >             +.+ color256_f_blue +.+ color256_b_blue
+-- >             +.+ underline8 +.+ underline256
 
 module System.Console.Rainbow (
   -- * Colors
@@ -35,17 +35,18 @@ module System.Console.Rainbow (
   , Foreground256
 
   -- * Chunks
-  , Chunk (chunkTextSpec, chunkText)
-  , chunk
+  , Chunk (..)
   , plain
   , Width(Width, unWidth)
   , chunkWidth
   , printChunks
+  , hPrintChunks
 
   -- * Mod
   , Mod(..)
   , ChangeText(..)
   , (.+.)
+  , (+.+)
 
   -- * Effects
   , Bold (Bold, unBold)
@@ -77,12 +78,46 @@ module System.Console.Rainbow (
   , Inverse256 (Inverse256, unInverse256)
   , inverse256, inverse256off
 
+  , BoldAll(..)
+  , bold, boldOff
+
+  , UnderlineAll(..)
+  , underline, underlineOff
+
+  , FlashAll(..)
+  , flash, flashOff
+
+  , InverseAll(..)
+  , inverse, inverseOff
+
+  , ForegroundAll (..)
+  , f_default
+  , f_black
+  , f_red
+  , f_green
+  , f_yellow
+  , f_blue
+  , f_magenta
+  , f_cyan
+  , f_white
+
+  , BackgroundAll (..)
+  , b_default
+  , b_black
+  , b_red
+  , b_green
+  , b_yellow
+  , b_blue
+  , b_magenta
+  , b_cyan
+  , b_white
+
 
   -- * Style and TextSpec
 
   -- | A style is a bundle of attributes that describes text
   -- attributes, such as its color and whether it is bold.
-  , StyleCommon (StyleCommon, bold, underline, flash, inverse)
+  , StyleCommon (StyleCommon, scBold, scUnderline, scFlash, scInverse)
   , Style8 (Style8, foreground8, background8, common8)
   , Style256 (Style256, foreground256, background256, common256)
   , defaultStyleCommon
@@ -683,6 +718,7 @@ import Data.Text (Text)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as X
 import qualified System.Console.Terminfo as T
+import System.IO as IO
 
 --
 -- Colors
@@ -710,6 +746,9 @@ data Term
 -- Mod
 --
 
+-- | A Mod is anything capable of modifying a Chunk. Usually these
+-- will modify the TextSpec, though a few Mod instead modify the Text
+-- itself.
 class Mod a where
   changeChunk :: Chunk -> a -> Chunk
 
@@ -721,9 +760,16 @@ newtype ChangeText = ChangeText { unChangeText :: Text -> Text }
 instance Mod ChangeText where
   changeChunk (Chunk ts t) (ChangeText f) = Chunk ts (f t)
 
-(.+.) :: Mod a => Chunk -> a -> Chunk
-(.+.) = changeChunk
+-- | Applies a modifier to a Chunk. Left associative.
+(+.+) :: Mod a => Chunk -> a -> Chunk
+(+.+) = changeChunk
 infixl 6 .+.
+
+-- | Composes modifiers. Useful to build up a single function that
+-- modifies a Chunk.
+(.+.) :: Mod a => (Chunk -> Chunk) -> a -> Chunk -> Chunk
+(.+.) f a c = changeChunk (f c) a
+infixl 6 +.+
 
 -- For Background8, Background256, Foreground8, Foreground256: the
 -- newtype wraps a Terminfo Color. If Nothing, use the default color.
@@ -761,6 +807,7 @@ instance Mod Foreground256 where
     Chunk (ts { style256 = (style256 ts) { foreground256 = f256 } } ) t
 
 
+
 --
 -- Chunks
 --
@@ -781,13 +828,9 @@ data Chunk = Chunk
   , chunkText :: Text
   } deriving (Eq, Show, Ord)
 
--- | Makes new Chunks.
-chunk :: TextSpec -> Text -> Chunk
-chunk = Chunk
-
 -- | Makes a plain Chunk; that is, one with a defaultTextSpec.
 plain :: Text -> Chunk
-plain = chunk defaultTextSpec
+plain = Chunk defaultTextSpec
 
 -- | How wide the text of a chunk is.
 newtype Width = Width { unWidth :: Int }
@@ -800,26 +843,32 @@ instance Monoid Width where
 chunkWidth :: Chunk -> Width
 chunkWidth (Chunk _ t) = Width . X.length $ t
 
--- | Sends a list of chunks to standard output for printing. Sets up
+-- | Sends a list of chunks to the given handle for printing. Sets up
 -- the terminal (this only needs to be done once.) Lazily processes
 -- the list of Chunk.
-printChunks :: Term -> [Chunk] -> IO ()
-printChunks t cs = do
+hPrintChunks :: IO.Handle -> Term -> [Chunk] -> IO ()
+hPrintChunks h t cs = do
   let setup = case t of
         Dumb -> T.setupTerm "dumb"
         TermName s -> T.setupTerm s
   term <- setup
-  mapM_ (printChunk term) cs
-  T.runTermOutput term (defaultColors term)
-  T.runTermOutput term
+  mapM_ (hPrintChunk h term) cs
+  T.hRunTermOutput h term (defaultColors term)
+  T.hRunTermOutput h term
     $ case T.getCapability term T.allAttributesOff of
         Nothing -> error $ "System.Console.Rainbow.printChunks: error: "
                    ++ "allAttributesOff failed"
         Just s -> s
 
-printChunk :: T.Terminal -> Chunk -> IO ()
-printChunk t (Chunk ts x) =
-  T.runTermOutput t
+-- | Sends a list of chunks to standard output for printing. Sets up
+-- the terminal (this only needs to be done once.) Lazily processes
+-- the list of Chunk.
+printChunks :: Term -> [Chunk] -> IO ()
+printChunks = hPrintChunks IO.stdout
+
+hPrintChunk :: IO.Handle -> T.Terminal -> Chunk -> IO ()
+hPrintChunk h t (Chunk ts x) =
+  T.hRunTermOutput h t
   . mconcat
   $ [defaultColors t, codes, txt]
   where
@@ -857,7 +906,7 @@ bold8off = Bold8 (Bold False)
 instance Mod Bold8 where
   changeChunk (Chunk ts t) (Bold8 b) =
     let c8 = common8 . style8 $ ts
-        c8' = c8 { bold = b }
+        c8' = c8 { scBold = b }
         ts' = ts { style8 = (style8 ts) { common8 = c8' } }
     in Chunk ts' t
 
@@ -873,7 +922,7 @@ underline8off = Underline8 (Underline False)
 instance Mod Underline8 where
   changeChunk (Chunk ts t) (Underline8 u) =
     let c8 = common8 . style8 $ ts
-        c8' = c8 { underline = u }
+        c8' = c8 { scUnderline = u }
         ts' = ts { style8 = (style8 ts) { common8 = c8' } }
     in Chunk ts' t
 
@@ -889,7 +938,7 @@ flash8off = Flash8 (Flash False)
 instance Mod Flash8 where
   changeChunk (Chunk ts t) (Flash8 f) =
     let c8 = common8 . style8 $ ts
-        c8' = c8 { flash = f }
+        c8' = c8 { scFlash = f }
         ts' = ts { style8 = (style8 ts) { common8 = c8' } }
     in Chunk ts' t
 
@@ -905,7 +954,7 @@ inverse8off = Inverse8 (Inverse False)
 instance Mod Inverse8 where
   changeChunk (Chunk ts t) (Inverse8 i) =
     let c8 = common8 . style8 $ ts
-        c8' = c8 { inverse = i }
+        c8' = c8 { scInverse = i }
         ts' = ts { style8 = (style8 ts) { common8 = c8' } }
     in Chunk ts' t
 
@@ -921,7 +970,7 @@ bold256off = Bold256 (Bold False)
 instance Mod Bold256 where
   changeChunk (Chunk ts t) (Bold256 b) =
     let c256 = common256 . style256 $ ts
-        c256' = c256 { bold = b }
+        c256' = c256 { scBold = b }
         ts' = ts { style256 = (style256 ts) { common256 = c256' } }
     in Chunk ts' t
 
@@ -937,7 +986,7 @@ underline256off = Underline256 (Underline False)
 instance Mod Underline256 where
   changeChunk (Chunk ts t) (Underline256 u) =
     let c256 = common256 . style256 $ ts
-        c256' = c256 { underline = u }
+        c256' = c256 { scUnderline = u }
         ts' = ts { style256 = (style256 ts) { common256 = c256' } }
     in Chunk ts' t
 
@@ -953,7 +1002,7 @@ flash256off = Flash256 (Flash False)
 instance Mod Flash256 where
   changeChunk (Chunk ts t) (Flash256 f) =
     let c256 = common256 . style256 $ ts
-        c256' = c256 { flash = f }
+        c256' = c256 { scFlash = f }
         ts' = ts { style256 = (style256 ts) { common256 = c256' } }
     in Chunk ts' t
 
@@ -969,10 +1018,158 @@ inverse256off = Inverse256 (Inverse False)
 instance Mod Inverse256 where
   changeChunk (Chunk ts t) (Inverse256 i) =
     let c256 = common256 . style256 $ ts
-        c256' = c256 { inverse = i }
+        c256' = c256 { scInverse = i }
         ts' = ts { style256 = (style256 ts) { common256 = c256' } }
     in Chunk ts' t
 
+
+--
+-- All
+--
+
+doAll
+  :: (Mod a, Mod b)
+  => (a, b)
+  -- ^ Turn on
+  -> (a, b)
+  -- ^ Turn off
+  -> Chunk
+  -> Bool
+  -> Chunk
+doAll on off c b =
+  flip changeChunk m1 . flip changeChunk m2 $ c
+  where
+    (m1, m2) = if b then on else off
+
+
+newtype BoldAll = BoldAll { unBoldAll :: Bool }
+  deriving (Eq, Ord, Show)
+
+bold :: BoldAll
+bold = BoldAll True
+
+boldOff :: BoldAll
+boldOff = BoldAll False
+
+instance Mod BoldAll where
+  changeChunk c =
+    doAll (bold8, bold256) (bold8off, bold256off) c . unBoldAll
+
+newtype UnderlineAll = UnderlineAll { unUnderlineAll :: Bool }
+  deriving (Eq, Ord, Show)
+
+underline :: UnderlineAll
+underline = UnderlineAll True
+
+underlineOff :: UnderlineAll
+underlineOff = UnderlineAll False
+
+instance Mod UnderlineAll where
+  changeChunk c =
+    doAll (underline8, underline256)
+          (underline8off, underline256off) c
+    . unUnderlineAll
+
+newtype FlashAll = FlashAll { unFlashAll :: Bool }
+  deriving (Eq, Ord, Show)
+
+flash :: FlashAll
+flash = FlashAll True
+
+flashOff :: FlashAll
+flashOff = FlashAll False
+
+instance Mod FlashAll where
+  changeChunk c =
+    doAll (flash8, flash256) (flash8off, flash256off) c
+    . unFlashAll
+
+newtype InverseAll = InverseAll { unInverseAll :: Bool }
+  deriving (Eq, Ord, Show)
+
+inverse :: InverseAll
+inverse = InverseAll True
+
+inverseOff :: InverseAll
+inverseOff = InverseAll False
+
+instance Mod InverseAll where
+  changeChunk c =
+    doAll (inverse8, inverse256) (inverse8off, inverse256off) c
+    . unInverseAll
+
+data ForegroundAll = ForegroundAll
+  { fa8 :: Foreground8
+  , fa256 :: Foreground256
+  }
+
+instance Mod ForegroundAll where
+  changeChunk c (ForegroundAll c8 c256) =
+    flip changeChunk c8 . flip changeChunk c256 $ c
+
+f_default :: ForegroundAll
+f_default = ForegroundAll color8_f_default color256_f_default
+
+f_black :: ForegroundAll
+f_black = ForegroundAll color8_f_black color256_f_black
+
+f_red :: ForegroundAll
+f_red = ForegroundAll color8_f_red color256_f_red
+
+f_green :: ForegroundAll
+f_green = ForegroundAll color8_f_green color256_f_green
+
+f_yellow :: ForegroundAll
+f_yellow = ForegroundAll color8_f_yellow color256_f_yellow
+
+f_blue :: ForegroundAll
+f_blue = ForegroundAll color8_f_blue color256_f_blue
+
+f_magenta :: ForegroundAll
+f_magenta = ForegroundAll color8_f_magenta color256_f_magenta
+
+f_cyan :: ForegroundAll
+f_cyan = ForegroundAll color8_f_cyan color256_f_cyan
+
+f_white :: ForegroundAll
+f_white = ForegroundAll color8_f_white color256_f_white
+
+
+data BackgroundAll = BackgroundAll
+  { ba8 :: Background8
+  , ba256 :: Background256
+  }
+
+instance Mod BackgroundAll where
+  changeChunk c (BackgroundAll c8 c256) =
+    flip changeChunk c8 . flip changeChunk c256 $ c
+
+b_default :: BackgroundAll
+b_default = BackgroundAll color8_b_default color256_b_default
+
+b_black :: BackgroundAll
+b_black = BackgroundAll color8_b_black color256_b_black
+
+b_red :: BackgroundAll
+b_red = BackgroundAll color8_b_red color256_b_red
+
+b_green :: BackgroundAll
+b_green = BackgroundAll color8_b_green color256_b_green
+
+b_yellow :: BackgroundAll
+b_yellow = BackgroundAll color8_b_yellow color256_b_yellow
+
+b_blue :: BackgroundAll
+b_blue = BackgroundAll color8_b_blue color256_b_blue
+
+b_magenta :: BackgroundAll
+b_magenta = BackgroundAll color8_b_magenta color256_b_magenta
+
+b_cyan :: BackgroundAll
+b_cyan = BackgroundAll color8_b_cyan color256_b_cyan
+
+b_white :: BackgroundAll
+b_white = BackgroundAll color8_b_white color256_b_white
 
 --
 -- Styles
@@ -983,10 +1180,10 @@ instance Mod Inverse256 where
 -- 256 color terminals, so that the text appearance can change
 -- depending on how many colors a terminal has.
 data StyleCommon = StyleCommon
-  { bold :: Bold
-  , underline :: Underline
-  , flash :: Flash
-  , inverse :: Inverse
+  { scBold :: Bold
+  , scUnderline :: Underline
+  , scFlash :: Flash
+  , scInverse :: Inverse
   } deriving (Show, Eq, Ord)
 
 -- | Describes text appearance (foreground and background colors, as
@@ -1008,10 +1205,10 @@ data Style256 = Style256
 -- | Has all bold, flash, underline, and inverse turned off.
 defaultStyleCommon :: StyleCommon
 defaultStyleCommon = StyleCommon
-  { bold = Bold False
-  , underline = Underline False
-  , flash = Flash False
-  , inverse = Inverse False
+  { scBold = Bold False
+  , scUnderline = Underline False
+  , scFlash = Flash False
+  , scInverse = Inverse False
   }
 
 -- | Uses the default terminal colors (which will vary depending on
@@ -1081,11 +1278,11 @@ commonAttrs :: T.Terminal -> StyleCommon -> T.TermOutput
 commonAttrs t s =
   let a = T.Attributes
         { T.standoutAttr = False
-        , T.underlineAttr = unUnderline . underline $ s
-        , T.reverseAttr = unInverse . inverse $ s
-        , T.blinkAttr = unFlash . flash $ s
+        , T.underlineAttr = unUnderline . scUnderline $ s
+        , T.reverseAttr = unInverse . scInverse $ s
+        , T.blinkAttr = unFlash . scFlash $ s
         , T.dimAttr = False
-        , T.boldAttr = unBold . bold $ s
+        , T.boldAttr = unBold . scBold $ s
         , T.invisibleAttr = False
         , T.protectedAttr = False
         }
