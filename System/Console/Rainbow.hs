@@ -54,6 +54,7 @@ module System.Console.Rainbow (
   -- * Terminal definitions
     Term(..)
   , termFromEnv
+  , smartTermFromEnv
 
   -- * Chunks
   , Chunk
@@ -837,6 +838,29 @@ termFromEnv = do
   t <- Env.lookupEnv "TERM"
   return $ maybe Dumb TermName t
 
+-- | Gets the terminal definition from the environment. If the first
+-- argument is True, the terminal is always obtained from the
+-- environment. If it is False, the terminal is only obtained from the
+-- environment if the given handle is not a terminal; otherwise, Dumb
+-- is returned.
+smartTermFromEnv
+  :: Bool
+  -- ^ Use True if the user always wants to see colors, even if
+  -- standard output is not a terminal. Otherwise, use False.
+
+  -> IO.Handle
+  -- ^ Check this handle to see if it is a terminal (typically you
+  -- will use stdout).
+
+  -> IO Term
+smartTermFromEnv alwaysColor h =
+  if alwaysColor
+  then termFromEnv
+  else do
+        isTerm <- IO.hIsTerminalDevice h
+        if isTerm
+          then termFromEnv
+          else return Dumb
 
 --
 -- Mod
