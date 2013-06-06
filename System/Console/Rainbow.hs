@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell, MultiParamTypeClasses, FlexibleInstances #-}
 -- | Handles colors and special effects for text. Internally this
 -- module uses the Haskell terminfo library, which links against the
 -- UNIX library of the same name, so it should work with a wide
@@ -58,17 +59,12 @@ module System.Console.Rainbow (
 
   -- * Chunks
   , Chunk
-  , plain
+  , M.Monoid(..)
+  , (<>)
 
   -- * Printing chunks
   , printChunks
   , hPrintChunks
-
-  -- * Mod
-  , Mod(..)
-  , ChangeText(..)
-  , (.+.)
-  , (+.+)
 
   -- * Effects for both 8 and 256 color terminals
 
@@ -741,18 +737,11 @@ module System.Console.Rainbow (
   -- Ordinarily you shouldn't need to use these types but they are
   -- here in case they are useful; in particular, you can use them to
   -- examine a Chunk's TextSpec to see what its characteristics are.
-  , StyleCommon (StyleCommon, scBold, scUnderline, scFlash, scInverse)
-  , Style8 (Style8, foreground8, background8, common8)
-  , Style256 (Style256, foreground256, background256, common256)
-  , defaultStyleCommon
-  , defaultStyle8
-  , defaultStyle256
+  , StyleCommon(..)
+  , Style8(..)
+  , Style256(..)
 
-  , TextSpec (TextSpec, style8, style256)
-  , defaultTextSpec
-
-  , chunkTextSpec
-  , chunkText
+  , TextSpec (..)
 
   -- * Basement
 
@@ -760,32 +749,12 @@ module System.Console.Rainbow (
   -- definitions above will give you an instance of Mod that will
   -- create the effect or color you need.
 
-  -- ** Modifier newtype wrappers
-
-  , Bold8 (Bold8, unBold8)
-  , Underline8 (Underline8, unUnderline8)
-  , Flash8 (Flash8, unFlash8)
-  , Inverse8 (Inverse8, unInverse8)
-
-  , Bold256 (Bold256, unBold256)
-  , Underline256 (Underline256, unUnderline256)
-  , Flash256 (Flash256, unFlash256)
-  , Inverse256 (Inverse256, unInverse256)
-
-  , BoldAll(..)
-  , UnderlineAll(..)
-  , FlashAll(..)
-  , InverseAll(..)
-
-  , ForegroundAll (..)
-  , BackgroundAll (..)
-
   -- ** Wrappers for effects
 
-  , Bold (Bold, unBold)
-  , Underline (Underline, unUnderline)
-  , Flash (Flash, unFlash)
-  , Inverse (Inverse, unInverse)
+  , Bold (..)
+  , Underline (..)
+  , Flash (..)
+  , Inverse (..)
 
   -- ** Wrappers for colors
 
@@ -799,10 +768,29 @@ module System.Console.Rainbow (
   , Foreground8 (..)
   , Foreground256 (..)
 
+  -- ** Lenses
+  , scBold
+  , scUnderline
+  , scFlash
+  , scInverse
+  , foreground8
+  , background8
+  , common8
+  , foreground256
+  , background256
+  , common256
+  , textSpec
+  , text
+
   ) where
 
 
-import Data.Monoid (Monoid, mempty, mconcat)
+-- # Imports
+
+import Control.Lens
+import qualified Data.String as Str
+import Data.Monoid (Monoid, mempty, mconcat, (<>), Last(..))
+import qualified Data.Monoid as M
 import Data.Text (Text)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as X
@@ -862,91 +850,150 @@ smartTermFromEnv alwaysColor h =
           then termFromEnv
           else return Dumb
 
---
--- Mod
---
-
--- | A Mod is anything capable of modifying a Chunk. Usually these
--- will modify the TextSpec, though a few Mod instead modify the Text
--- itself. Typically you will create a Chunk with 'plain' and then use
--- '+.+' repeatedly to modify the Chunk to suit your needs.
-class Mod a where
-  changeChunk :: Chunk -> a -> Chunk
-
--- | When used as a modifier, a Text will replace the text within a
--- Chunk with new text.
---
--- > {-# LANGUAGE OverloadedStrings #-}
--- > goodbyeWorld :: Chunk
--- > goodbyeWorld = plain "Hello world!" +.+ "Goodbye world!"
-instance Mod Text where
-  changeChunk (Chunk ts _) t' = Chunk ts t'
-
--- | Useful if you want to inspect the text in a Chunk and then build
--- a new Chunk with different text.
---
--- > {-# LANGUAGE OverloadedStrings #-}
--- > import Data.Text (append)
--- > helloDolly :: Chunk
--- > helloDolly = plain "Hello" +.+ ChangeText (`append` " Dolly")
-newtype ChangeText = ChangeText { unChangeText :: Text -> Text }
-
-instance Mod ChangeText where
-  changeChunk (Chunk ts t) (ChangeText f) = Chunk ts (f t)
-
--- | Applies a modifier to a Chunk. Left associative.
-(+.+) :: Mod a => Chunk -> a -> Chunk
-(+.+) = changeChunk
-infixl 6 .+.
-
--- | Composes modifiers. Useful to build up a single function that
--- modifies a Chunk. You might use this to build up several modifiers
--- and use them repeatedly, or you might write an API that expects
--- functions of type @Chunk -> Chunk@ and then you could use '.+.' to
--- build those functions. Left associative.
---
--- > redBoldUnderline :: Chunk -> Chunk
--- > redBoldUnderline = id .+. f_red .+. bold .+. underline
-
-(.+.) :: Mod a => (Chunk -> Chunk) -> a -> Chunk -> Chunk
-(.+.) f a c = changeChunk (f c) a
-infixl 6 +.+
-
 -- For Background8, Background256, Foreground8, Foreground256: the
 -- newtype wraps a Terminfo Color. If Nothing, use the default color.
 
 -- | Background color in an 8 color setting.
-newtype Background8 = Background8 { unBackground8 :: Maybe T.Color }
+newtype Background8 = Background8
+  { _unBackground8 :: Last (Maybe T.Color) }
   deriving (Eq, Show, Ord)
 
-instance Mod Background8 where
-  changeChunk (Chunk ts t) b8 =
-    Chunk (ts { style8 = (style8 ts) { background8 = b8 } } ) t
+makeWrapped ''Background8
+
+instance Monoid Background8 where
+  mappend (Background8 b1) (Background8 b2) = Background8 $ b1 <> b2
+  mempty = Background8 mempty
 
 -- | Background color in a 256 color setting.
-newtype Background256 = Background256 { unBackground256 :: Maybe T.Color }
+newtype Background256 = Background256
+  { _unBackground256 :: Last (Maybe T.Color) }
   deriving (Eq, Show, Ord)
 
-instance Mod Background256 where
-  changeChunk (Chunk ts t) b256 =
-    Chunk (ts { style256 = (style256 ts) { background256 = b256 } } ) t
+makeWrapped ''Background256
+
+instance Monoid Background256 where
+  mappend (Background256 b1) (Background256 b2)
+    = Background256 $ b1 <> b2
+  mempty = Background256 mempty
 
 -- | Foreground color in an 8 color setting.
-newtype Foreground8 = Foreground8 { unForeground8 :: Maybe T.Color }
+newtype Foreground8 = Foreground8
+  { _unForeground8 :: Last (Maybe T.Color) }
   deriving (Eq, Show, Ord)
 
-instance Mod Foreground8 where
-  changeChunk (Chunk ts t) f8 =
-    Chunk (ts { style8 = (style8 ts) { foreground8 = f8 } } ) t
+makeWrapped ''Foreground8
+
+instance Monoid Foreground8 where
+  mappend (Foreground8 b1) (Foreground8 b2)
+    = Foreground8 $ b1 <> b2
+  mempty = Foreground8 mempty
 
 -- | Foreground color in a 256 color setting.
-newtype Foreground256 = Foreground256 { unForeground256 :: Maybe T.Color }
+newtype Foreground256 = Foreground256
+  { _unForeground256 :: Last (Maybe T.Color) }
   deriving (Eq, Show, Ord)
 
-instance Mod Foreground256 where
-  changeChunk (Chunk ts t) f256 =
-    Chunk (ts { style256 = (style256 ts) { foreground256 = f256 } } ) t
+makeWrapped ''Foreground256
 
+instance Monoid Foreground256 where
+  mappend (Foreground256 b1) (Foreground256 b2)
+    = Foreground256 $ b1 <> b2
+  mempty = Foreground256 mempty
+
+
+--
+-- Effects
+--
+newtype Bold = Bold { _unBold :: Bool }
+  deriving (Show, Eq, Ord)
+
+makeWrapped ''Bold
+
+newtype Underline = Underline { _unUnderline :: Bool }
+  deriving (Show, Eq, Ord)
+
+makeWrapped ''Underline
+
+newtype Flash = Flash { _unFlash :: Bool }
+  deriving (Show, Eq, Ord)
+
+makeWrapped ''Flash
+
+newtype Inverse = Inverse { _unInverse :: Bool }
+  deriving (Show, Eq, Ord)
+
+makeWrapped ''Inverse
+
+--
+-- Styles
+--
+
+-- | Style elements that apply in both 8 and 256 color
+-- terminals. However, the elements are described separately for 8 and
+-- 256 color terminals, so that the text appearance can change
+-- depending on how many colors a terminal has.
+data StyleCommon = StyleCommon
+  { _scBold :: M.Last Bold
+  , _scUnderline :: M.Last Underline
+  , _scFlash :: M.Last Flash
+  , _scInverse :: M.Last Inverse
+  } deriving (Show, Eq, Ord)
+
+makeLenses ''StyleCommon
+
+instance Monoid StyleCommon where
+  mempty = StyleCommon (Last Nothing) (Last Nothing)
+                       (Last Nothing) (Last Nothing)
+  mappend (StyleCommon b1 u1 f1 i1) (StyleCommon b2 u2 f2 i2)
+    = StyleCommon (b1 <> b2) (u1 <> u2) (f1 <> f2) (i1 <> i2)
+
+-- | Describes text appearance (foreground and background colors, as
+-- well as other attributes such as bold) for an 8 color terminal.
+data Style8 = Style8
+  { _foreground8 :: Foreground8
+  , _background8 :: Background8
+  , _common8 :: StyleCommon
+  } deriving (Show, Eq, Ord)
+
+makeLenses ''Style8
+
+instance Monoid Style8 where
+  mappend (Style8 fx bx cx) (Style8 fy by cy)
+    = Style8 (fx <> fy) (bx <> by) (cx <> cy)
+  mempty = Style8 mempty mempty mempty
+
+-- | Describes text appearance (foreground and background colors, as
+-- well as other attributes such as bold) for a 256 color terminal.
+data Style256 = Style256
+  { _foreground256 :: Foreground256
+  , _background256 :: Background256
+  , _common256 :: StyleCommon
+  } deriving (Show, Eq, Ord)
+
+makeLenses ''Style256
+
+instance Monoid Style256 where
+  mappend (Style256 fx bx cx) (Style256 fy by cy)
+    = Style256 (fx <> fy) (bx <> by) (cx <> cy)
+  mempty = Style256 mempty mempty mempty
+
+--
+-- TextSpec
+--
+
+-- | The TextSpec bundles together the styles for the 8 and 256 color
+-- terminals, so that the text can be portrayed on any terminal.
+data TextSpec = TextSpec
+  { _style8 :: Style8
+  , _style256 :: Style256
+  } deriving (Show, Eq, Ord)
+
+makeLenses ''TextSpec
+
+instance Monoid TextSpec where
+  mappend (TextSpec x1 x2) (TextSpec y1 y2)
+    = TextSpec (x1 <> y1) (x2 <> y2)
+  mempty = TextSpec mempty mempty
 
 --
 -- Chunks
@@ -964,16 +1011,89 @@ instance Mod Foreground256 where
 -- 'printChunks'.
 
 data Chunk = Chunk
-  { chunkTextSpec :: TextSpec
-  , chunkText :: Text
+  { _textSpec :: TextSpec
+  , _text :: Last Text
   } deriving (Eq, Show, Ord)
 
--- | Makes a plain Chunk; that is, one that has no effects and is
--- printed in the default foreground and background color for the
--- terminal. Modify this chunk so that it has the colors and effects
--- that you want.
-plain :: Text -> Chunk
-plain = Chunk defaultTextSpec
+makeLenses ''Chunk
+
+instance Str.IsString Chunk where
+  fromString s = Chunk mempty (Last (Just (X.pack s)))
+
+instance Monoid Chunk where
+  mempty = Chunk mempty mempty
+  mappend (Chunk s1 t1) (Chunk s2 t2) = Chunk (s1 <> s2) (t1 <> t2)
+
+
+defaultColors :: T.Terminal -> T.TermOutput
+defaultColors term =
+  fromMaybe mempty (T.getCapability term T.restoreDefaultColors)
+
+--
+-- Internal
+--
+
+
+commonAttrs :: T.Terminal -> StyleCommon -> T.TermOutput
+commonAttrs t s =
+  let a = T.Attributes
+        { T.standoutAttr = False
+        , T.underlineAttr = maybe False _unUnderline
+          $ s ^. scUnderline . unwrapped
+        , T.reverseAttr = maybe False _unInverse
+          $ s ^. scInverse . unwrapped
+        , T.blinkAttr = maybe False _unFlash
+          $ s ^. scFlash . unwrapped
+        , T.dimAttr = False
+        , T.boldAttr = maybe False _unBold
+          $ s ^. scBold . unwrapped
+        , T.invisibleAttr = False
+        , T.protectedAttr = False
+        }
+  in case T.getCapability t (T.setAttributes) of
+      Nothing -> error $ "System.Console.Rainbow: commonAttrs: "
+                 ++ "capability failed; should never happen"
+      Just f -> f a
+
+
+-- | Gets the right set of terminal codes to apply the desired
+-- highlighting, bold, underlining, etc. Be sure to apply the
+-- attributes first (bold, underlining, etc) and then the
+-- colors. Setting the colors first and then the attributes seems to
+-- reset the colors, giving blank output.
+getTermCodes
+  :: T.Terminal
+  -> TextSpec
+  -> T.TermOutput
+getTermCodes t ts = fromMaybe mempty $ do
+  cols <- T.getCapability t T.termColors
+  let TextSpec s8 s256 = ts
+      Style8 f8 b8 c8 = s8
+      Style256 f256 b256 c256 = s256
+  setFg <- T.getCapability t T.setForegroundColor
+  setBg <- T.getCapability t T.setBackgroundColor
+  (fg, bg, cm) <- case () of
+    _ | cols >= 256 -> Just $ ( f256 ^. unwrapped . unwrapped
+                              , b256 ^. unwrapped . unwrapped
+                              , c256)
+      | cols >= 8 -> Just ( f8 ^. unwrapped . unwrapped
+                         , b8 ^. unwrapped . unwrapped
+                         , c8)
+      | otherwise -> Nothing
+  let oFg = maybe mempty (maybe mempty setFg) fg
+      oBg = maybe mempty (maybe mempty setBg) bg
+      oCm = commonAttrs t cm
+  return $ mconcat [oCm, oFg, oBg]
+
+
+hPrintChunk :: IO.Handle -> T.Terminal -> Chunk -> IO ()
+hPrintChunk h t (Chunk ts x) =
+  T.hRunTermOutput h t
+  . mconcat
+  $ [defaultColors t, codes, txt]
+  where
+    codes = getTermCodes t ts
+    txt = T.termText . maybe "" X.unpack . getLast $ x
 
 -- | Sends a list of chunks to the given handle for printing. Sets up
 -- the terminal (this only needs to be done once.) Lazily processes
@@ -1008,2132 +1128,2432 @@ hPrintChunks h t cs = do
 printChunks :: Term -> [Chunk] -> IO ()
 printChunks = hPrintChunks IO.stdout
 
-hPrintChunk :: IO.Handle -> T.Terminal -> Chunk -> IO ()
-hPrintChunk h t (Chunk ts x) =
-  T.hRunTermOutput h t
-  . mconcat
-  $ [defaultColors t, codes, txt]
-  where
-    codes = getTermCodes t ts
-    txt = T.termText . X.unpack $ x
+-- | A convenience function for printing one chunk at a time. There
+-- might be bad performance implications to using this, as the
+-- terminal is reset every time (though there might not be; I haven't
+-- tested it.)
+putChunk :: Chunk -> IO ()
+putChunk c = do
+  t <- termFromEnv
+  printChunks t [c]
 
-defaultColors :: T.Terminal -> T.TermOutput
-defaultColors term =
-  fromMaybe mempty (T.getCapability term T.restoreDefaultColors)
+-- | A convenience function for printing one chunk at a time. There
+-- might be bad performance implications to using this, as the
+-- terminal is reset every time (though there might not be; I haven't
+-- tested it.) Appends a newline.
+putChunkLn :: Chunk -> IO ()
+putChunkLn c = putChunk c >> putStr "\n"
 
---
--- Effects
---
-newtype Bold = Bold { unBold :: Bool }
-  deriving (Show, Eq, Ord)
+bold8 :: Chunk
+bold8 = mempty & textSpec . style8 . common8
+                 . scBold . unwrapped .~ Just (Bold True)
 
-newtype Underline = Underline { unUnderline :: Bool }
-  deriving (Show, Eq, Ord)
+bold8off :: Chunk
+bold8off = mempty & textSpec . style8 . common8
+                    . scBold . unwrapped .~ Just (Bold False)
 
-newtype Flash = Flash { unFlash :: Bool }
-  deriving (Show, Eq, Ord)
+underline8 :: Chunk
+underline8 = mempty & textSpec . style8 . common8
+                 . scUnderline . unwrapped .~ Just (Underline True)
 
-newtype Inverse = Inverse { unInverse :: Bool }
-  deriving (Show, Eq, Ord)
+underline8off :: Chunk
+underline8off = mempty & textSpec . style8 . common8
+                    . scUnderline . unwrapped .~ Just (Underline False)
 
-newtype Bold8 = Bold8 { unBold8 :: Bold }
-  deriving (Show, Eq, Ord)
+flash8 :: Chunk
+flash8 = mempty & textSpec . style8 . common8
+                 . scFlash . unwrapped .~ Just (Flash True)
 
-bold8 :: Bold8
-bold8 = Bold8 (Bold True)
+flash8off :: Chunk
+flash8off = mempty & textSpec . style8 . common8
+                    . scFlash . unwrapped .~ Just (Flash False)
 
-bold8off :: Bold8
-bold8off = Bold8 (Bold False)
+inverse8 :: Chunk
+inverse8 = mempty & textSpec . style8 . common8
+                 . scInverse . unwrapped .~ Just (Inverse True)
 
-instance Mod Bold8 where
-  changeChunk (Chunk ts t) (Bold8 b) =
-    let c8 = common8 . style8 $ ts
-        c8' = c8 { scBold = b }
-        ts' = ts { style8 = (style8 ts) { common8 = c8' } }
-    in Chunk ts' t
+inverse8off :: Chunk
+inverse8off = mempty & textSpec . style8 . common8
+                    . scInverse . unwrapped .~ Just (Inverse False)
 
-newtype Underline8 = Underline8 { unUnderline8 :: Underline }
-  deriving (Show, Eq, Ord)
+underline256 :: Chunk
+underline256 = mempty & textSpec . style256 . common256
+                 . scUnderline . unwrapped .~ Just (Underline True)
 
-underline8 :: Underline8
-underline8 = Underline8 (Underline True)
+underline256off :: Chunk
+underline256off = mempty & textSpec . style256 . common256
+                    . scUnderline . unwrapped .~ Just (Underline False)
 
-underline8off :: Underline8
-underline8off = Underline8 (Underline False)
+bold256 :: Chunk
+bold256 = mempty & textSpec . style256 . common256
+                 . scBold . unwrapped .~ Just (Bold True)
 
-instance Mod Underline8 where
-  changeChunk (Chunk ts t) (Underline8 u) =
-    let c8 = common8 . style8 $ ts
-        c8' = c8 { scUnderline = u }
-        ts' = ts { style8 = (style8 ts) { common8 = c8' } }
-    in Chunk ts' t
+bold256off :: Chunk
+bold256off = mempty & textSpec . style256 . common256
+                    . scBold . unwrapped .~ Just (Bold False)
 
-newtype Flash8 = Flash8 { unFlash8 :: Flash }
-  deriving (Show, Eq, Ord)
+inverse256 :: Chunk
+inverse256 = mempty & textSpec . style256 . common256
+                 . scInverse . unwrapped .~ Just (Inverse True)
 
-flash8 :: Flash8
-flash8 = Flash8 (Flash True)
+inverse256off :: Chunk
+inverse256off = mempty & textSpec . style256 . common256
+                    . scInverse . unwrapped .~ Just (Inverse False)
 
-flash8off :: Flash8
-flash8off = Flash8 (Flash False)
+flash256 :: Chunk
+flash256 = mempty & textSpec . style256 . common256
+                 . scFlash . unwrapped .~ Just (Flash True)
 
-instance Mod Flash8 where
-  changeChunk (Chunk ts t) (Flash8 f) =
-    let c8 = common8 . style8 $ ts
-        c8' = c8 { scFlash = f }
-        ts' = ts { style8 = (style8 ts) { common8 = c8' } }
-    in Chunk ts' t
-
-newtype Inverse8 = Inverse8 { unInverse8 :: Inverse }
-  deriving (Show, Eq, Ord)
-
-inverse8 :: Inverse8
-inverse8 = Inverse8 (Inverse True)
-
-inverse8off :: Inverse8
-inverse8off = Inverse8 (Inverse False)
-
-instance Mod Inverse8 where
-  changeChunk (Chunk ts t) (Inverse8 i) =
-    let c8 = common8 . style8 $ ts
-        c8' = c8 { scInverse = i }
-        ts' = ts { style8 = (style8 ts) { common8 = c8' } }
-    in Chunk ts' t
-
-newtype Bold256 = Bold256 { unBold256 :: Bold }
-  deriving (Show, Eq, Ord)
-
-bold256 :: Bold256
-bold256 = Bold256 (Bold True)
-
-bold256off :: Bold256
-bold256off = Bold256 (Bold False)
-
-instance Mod Bold256 where
-  changeChunk (Chunk ts t) (Bold256 b) =
-    let c256 = common256 . style256 $ ts
-        c256' = c256 { scBold = b }
-        ts' = ts { style256 = (style256 ts) { common256 = c256' } }
-    in Chunk ts' t
-
-newtype Underline256 = Underline256 { unUnderline256 :: Underline }
-  deriving (Show, Eq, Ord)
-
-underline256 :: Underline256
-underline256 = Underline256 (Underline True)
-
-underline256off :: Underline256
-underline256off = Underline256 (Underline False)
-
-instance Mod Underline256 where
-  changeChunk (Chunk ts t) (Underline256 u) =
-    let c256 = common256 . style256 $ ts
-        c256' = c256 { scUnderline = u }
-        ts' = ts { style256 = (style256 ts) { common256 = c256' } }
-    in Chunk ts' t
-
-newtype Flash256 = Flash256 { unFlash256 :: Flash }
-  deriving (Show, Eq, Ord)
-
-flash256 :: Flash256
-flash256 = Flash256 (Flash True)
-
-flash256off :: Flash256
-flash256off = Flash256 (Flash False)
-
-instance Mod Flash256 where
-  changeChunk (Chunk ts t) (Flash256 f) =
-    let c256 = common256 . style256 $ ts
-        c256' = c256 { scFlash = f }
-        ts' = ts { style256 = (style256 ts) { common256 = c256' } }
-    in Chunk ts' t
-
-newtype Inverse256 = Inverse256 { unInverse256 :: Inverse }
-  deriving (Show, Eq, Ord)
-
-inverse256 :: Inverse256
-inverse256 = Inverse256 (Inverse True)
-
-inverse256off :: Inverse256
-inverse256off = Inverse256 (Inverse False)
-
-instance Mod Inverse256 where
-  changeChunk (Chunk ts t) (Inverse256 i) =
-    let c256 = common256 . style256 $ ts
-        c256' = c256 { scInverse = i }
-        ts' = ts { style256 = (style256 ts) { common256 = c256' } }
-    in Chunk ts' t
-
+flash256off :: Chunk
+flash256off = mempty & textSpec . style256 . common256
+                    . scFlash . unwrapped .~ Just (Flash False)
 
 --
 -- All
 --
 
-doAll
-  :: (Mod a, Mod b)
-  => (a, b)
-  -- ^ Turn on
-  -> (a, b)
-  -- ^ Turn off
-  -> Chunk
-  -> Bool
-  -> Chunk
-doAll on off c b =
-  flip changeChunk m1 . flip changeChunk m2 $ c
-  where
-    (m1, m2) = if b then on else off
 
+bold :: Chunk
+bold = bold8 <> bold256
 
-newtype BoldAll = BoldAll { unBoldAll :: Bool }
-  deriving (Eq, Ord, Show)
+boldOff :: Chunk
+boldOff = bold8off <> bold256off
 
-bold :: BoldAll
-bold = BoldAll True
+inverse :: Chunk
+inverse = inverse8 <> inverse256
 
-boldOff :: BoldAll
-boldOff = BoldAll False
+inverseOff :: Chunk
+inverseOff = inverse8off <> inverse256off
 
-instance Mod BoldAll where
-  changeChunk c =
-    doAll (bold8, bold256) (bold8off, bold256off) c . unBoldAll
+flash :: Chunk
+flash = flash8 <> flash256
 
-newtype UnderlineAll = UnderlineAll { unUnderlineAll :: Bool }
-  deriving (Eq, Ord, Show)
+flashOff :: Chunk
+flashOff = flash8off <> flash256off
 
-underline :: UnderlineAll
-underline = UnderlineAll True
+underline :: Chunk
+underline = underline8 <> underline256
 
-underlineOff :: UnderlineAll
-underlineOff = UnderlineAll False
+underlineOff :: Chunk
+underlineOff = underline8off <> underline256off
 
-instance Mod UnderlineAll where
-  changeChunk c =
-    doAll (underline8, underline256)
-          (underline8off, underline256off) c
-    . unUnderlineAll
+f_default :: Chunk
+f_default = color8_f_default <> color256_f_default
 
-newtype FlashAll = FlashAll { unFlashAll :: Bool }
-  deriving (Eq, Ord, Show)
+f_black :: Chunk
+f_black = color8_f_black <> color256_f_black
 
-flash :: FlashAll
-flash = FlashAll True
+f_red :: Chunk
+f_red = color8_f_red <> color256_f_red
 
-flashOff :: FlashAll
-flashOff = FlashAll False
+f_green :: Chunk
+f_green = color8_f_green <> color256_f_green
 
-instance Mod FlashAll where
-  changeChunk c =
-    doAll (flash8, flash256) (flash8off, flash256off) c
-    . unFlashAll
+f_yellow :: Chunk
+f_yellow = color8_f_yellow <> color256_f_yellow
 
-newtype InverseAll = InverseAll { unInverseAll :: Bool }
-  deriving (Eq, Ord, Show)
+f_blue :: Chunk
+f_blue = color8_f_blue <> color256_f_blue
 
-inverse :: InverseAll
-inverse = InverseAll True
+f_magenta :: Chunk
+f_magenta = color8_f_magenta <> color256_f_magenta
 
-inverseOff :: InverseAll
-inverseOff = InverseAll False
+f_cyan :: Chunk
+f_cyan = color8_f_cyan <> color256_f_cyan
 
-instance Mod InverseAll where
-  changeChunk c =
-    doAll (inverse8, inverse256) (inverse8off, inverse256off) c
-    . unInverseAll
+f_white :: Chunk
+f_white = color8_f_white <> color256_f_white
 
-data ForegroundAll = ForegroundAll
-  { fa8 :: Foreground8
-  , fa256 :: Foreground256
-  }
+b_default :: Chunk
+b_default = color8_b_default <> color256_b_default
 
-instance Mod ForegroundAll where
-  changeChunk c (ForegroundAll c8 c256) =
-    flip changeChunk c8 . flip changeChunk c256 $ c
+b_black :: Chunk
+b_black = color8_b_black <> color256_b_black
 
-f_default :: ForegroundAll
-f_default = ForegroundAll color8_f_default color256_f_default
+b_red :: Chunk
+b_red = color8_b_red <> color256_b_red
 
-f_black :: ForegroundAll
-f_black = ForegroundAll color8_f_black color256_f_black
+b_green :: Chunk
+b_green = color8_b_green <> color256_b_green
 
-f_red :: ForegroundAll
-f_red = ForegroundAll color8_f_red color256_f_red
+b_yellow :: Chunk
+b_yellow = color8_b_yellow <> color256_b_yellow
 
-f_green :: ForegroundAll
-f_green = ForegroundAll color8_f_green color256_f_green
+b_blue :: Chunk
+b_blue = color8_b_blue <> color256_b_blue
 
-f_yellow :: ForegroundAll
-f_yellow = ForegroundAll color8_f_yellow color256_f_yellow
+b_magenta :: Chunk
+b_magenta = color8_b_magenta <> color256_b_magenta
 
-f_blue :: ForegroundAll
-f_blue = ForegroundAll color8_f_blue color256_f_blue
+b_cyan :: Chunk
+b_cyan = color8_b_cyan <> color256_b_cyan
 
-f_magenta :: ForegroundAll
-f_magenta = ForegroundAll color8_f_magenta color256_f_magenta
-
-f_cyan :: ForegroundAll
-f_cyan = ForegroundAll color8_f_cyan color256_f_cyan
-
-f_white :: ForegroundAll
-f_white = ForegroundAll color8_f_white color256_f_white
-
-
-data BackgroundAll = BackgroundAll
-  { ba8 :: Background8
-  , ba256 :: Background256
-  }
-
-instance Mod BackgroundAll where
-  changeChunk c (BackgroundAll c8 c256) =
-    flip changeChunk c8 . flip changeChunk c256 $ c
-
-b_default :: BackgroundAll
-b_default = BackgroundAll color8_b_default color256_b_default
-
-b_black :: BackgroundAll
-b_black = BackgroundAll color8_b_black color256_b_black
-
-b_red :: BackgroundAll
-b_red = BackgroundAll color8_b_red color256_b_red
-
-b_green :: BackgroundAll
-b_green = BackgroundAll color8_b_green color256_b_green
-
-b_yellow :: BackgroundAll
-b_yellow = BackgroundAll color8_b_yellow color256_b_yellow
-
-b_blue :: BackgroundAll
-b_blue = BackgroundAll color8_b_blue color256_b_blue
-
-b_magenta :: BackgroundAll
-b_magenta = BackgroundAll color8_b_magenta color256_b_magenta
-
-b_cyan :: BackgroundAll
-b_cyan = BackgroundAll color8_b_cyan color256_b_cyan
-
-b_white :: BackgroundAll
-b_white = BackgroundAll color8_b_white color256_b_white
-
---
--- Styles
---
-
--- | Style elements that apply in both 8 and 256 color
--- terminals. However, the elements are described separately for 8 and
--- 256 color terminals, so that the text appearance can change
--- depending on how many colors a terminal has.
-data StyleCommon = StyleCommon
-  { scBold :: Bold
-  , scUnderline :: Underline
-  , scFlash :: Flash
-  , scInverse :: Inverse
-  } deriving (Show, Eq, Ord)
-
--- | Describes text appearance (foreground and background colors, as
--- well as other attributes such as bold) for an 8 color terminal.
-data Style8 = Style8
-  { foreground8 :: Foreground8
-  , background8 :: Background8
-  , common8 :: StyleCommon
-  } deriving (Show, Eq, Ord)
-
--- | Describes text appearance (foreground and background colors, as
--- well as other attributes such as bold) for a 256 color terminal.
-data Style256 = Style256
-  { foreground256 :: Foreground256
-  , background256 :: Background256
-  , common256 :: StyleCommon
-  } deriving (Show, Eq, Ord)
-
--- | Has all bold, flash, underline, and inverse turned off.
-defaultStyleCommon :: StyleCommon
-defaultStyleCommon = StyleCommon
-  { scBold = Bold False
-  , scUnderline = Underline False
-  , scFlash = Flash False
-  , scInverse = Inverse False
-  }
-
--- | Uses the default terminal colors (which will vary depending on
--- the terminal).
-defaultStyle8 :: Style8
-defaultStyle8 = Style8
-  { foreground8 = color8_f_default
-  , background8 = color8_b_default
-  , common8 = defaultStyleCommon
-  }
-
--- | Uses the default terminal colors (which will vary depending on
--- the terminal).
-defaultStyle256 :: Style256
-defaultStyle256 = Style256
-  { foreground256 = color256_f_default
-  , background256 = color256_b_default
-  , common256 = defaultStyleCommon
-  }
-
---
--- TextSpec
---
-
--- | The TextSpec bundles together the styles for the 8 and 256 color
--- terminals, so that the text can be portrayed on any terminal.
-data TextSpec = TextSpec
-  { style8 :: Style8
-  , style256 :: Style256
-  } deriving (Show, Eq, Ord)
-
--- | A TextSpec with the default colors on 8 and 256 color terminals,
--- with all attributes turned off.
-defaultTextSpec :: TextSpec
-defaultTextSpec = TextSpec
-  { style8 = defaultStyle8
-  , style256 = defaultStyle256
-  }
-
---
--- Internal
---
-
-commonAttrs :: T.Terminal -> StyleCommon -> T.TermOutput
-commonAttrs t s =
-  let a = T.Attributes
-        { T.standoutAttr = False
-        , T.underlineAttr = unUnderline . scUnderline $ s
-        , T.reverseAttr = unInverse . scInverse $ s
-        , T.blinkAttr = unFlash . scFlash $ s
-        , T.dimAttr = False
-        , T.boldAttr = unBold . scBold $ s
-        , T.invisibleAttr = False
-        , T.protectedAttr = False
-        }
-  in case T.getCapability t (T.setAttributes) of
-      Nothing -> error $ "System.Console.Rainbow: commonAttrs: "
-                 ++ "capability failed; should never happen"
-      Just f -> f a
-
-
--- | Gets the right set of terminal codes to apply the desired
--- highlighting, bold, underlining, etc. Be sure to apply the
--- attributes first (bold, underlining, etc) and then the
--- colors. Setting the colors first and then the attributes seems to
--- reset the colors, giving blank output.
-getTermCodes
-  :: T.Terminal
-  -> TextSpec
-  -> T.TermOutput
-getTermCodes t ts = fromMaybe mempty $ do
-  cols <- T.getCapability t T.termColors
-  let TextSpec s8 s256 = ts
-      Style8 f8 b8 c8 = s8
-      Style256 f256 b256 c256 = s256
-  setFg <- T.getCapability t T.setForegroundColor
-  setBg <- T.getCapability t T.setBackgroundColor
-  (fg, bg, cm) <- case () of
-    _ | cols >= 256 -> Just $ ( unForeground256 f256
-                              , unBackground256 b256
-                              , c256 )
-      | cols >= 8 -> Just ( unForeground8 f8
-                         , unBackground8 b8
-                         , c8)
-      | otherwise -> Nothing
-  let oFg = maybe mempty setFg fg
-      oBg = maybe mempty setBg bg
-      oCm = commonAttrs t cm
-  return $ mconcat [oCm, oFg, oBg]
+b_white :: Chunk
+b_white = color8_b_white <> color256_b_white
 
 
 --
 -- Color basement
 --
-color8_f_default :: Foreground8
-color8_f_default = Foreground8 Nothing
 
-color8_f_black :: Foreground8
-color8_f_black = Foreground8 $ Just T.Black
+color8_f_default :: Chunk
+color8_f_default = mempty & textSpec . style8 . foreground8
+                            . unwrapped . unwrapped .~ (Just Nothing)
 
-color8_f_red :: Foreground8
-color8_f_red = Foreground8 $ Just T.Red
 
-color8_f_green :: Foreground8
-color8_f_green = Foreground8 $ Just T.Green
+color8_f_black :: Chunk
+color8_f_black = mempty & textSpec . style8 . foreground8
+  . unwrapped . unwrapped .~ (Just (Just T.Black))
 
-color8_f_yellow :: Foreground8
-color8_f_yellow = Foreground8 $ Just T.Yellow
+color8_f_red :: Chunk
+color8_f_red = mempty & textSpec . style8 . foreground8
+  . unwrapped . unwrapped .~ (Just (Just T.Red))
 
-color8_f_blue :: Foreground8
-color8_f_blue = Foreground8 $ Just T.Blue
+color8_f_green :: Chunk
+color8_f_green = mempty & textSpec . style8 . foreground8
+  . unwrapped . unwrapped .~ (Just (Just T.Green))
 
-color8_f_magenta :: Foreground8
-color8_f_magenta = Foreground8 $ Just T.Magenta
+color8_f_yellow :: Chunk
+color8_f_yellow = mempty & textSpec . style8 . foreground8
+  . unwrapped . unwrapped .~ (Just (Just T.Yellow))
 
-color8_f_cyan :: Foreground8
-color8_f_cyan = Foreground8 $ Just T.Cyan
+color8_f_blue :: Chunk
+color8_f_blue = mempty & textSpec . style8 . foreground8
+  . unwrapped . unwrapped .~ (Just (Just T.Blue))
 
-color8_f_white :: Foreground8
-color8_f_white = Foreground8 $ Just T.White
+color8_f_magenta :: Chunk
+color8_f_magenta = mempty & textSpec . style8 . foreground8
+  . unwrapped . unwrapped .~ (Just (Just T.Magenta))
 
-color8_b_default :: Background8
-color8_b_default = Background8 Nothing
+color8_f_cyan :: Chunk
+color8_f_cyan = mempty & textSpec . style8 . foreground8
+  . unwrapped . unwrapped .~ (Just (Just T.Cyan))
 
-color8_b_black :: Background8
-color8_b_black = Background8 $ Just T.Black
+color8_f_white :: Chunk
+color8_f_white = mempty & textSpec . style8 . foreground8
+  . unwrapped . unwrapped .~ (Just (Just T.White))
 
-color8_b_red :: Background8
-color8_b_red = Background8 $ Just T.Red
 
-color8_b_green :: Background8
-color8_b_green = Background8 $ Just T.Green
+color8_b_default :: Chunk
+color8_b_default = mempty & textSpec . style8 . background8
+                            . unwrapped . unwrapped .~ (Just Nothing)
 
-color8_b_yellow :: Background8
-color8_b_yellow = Background8 $ Just T.Yellow
+color8_b_black :: Chunk
+color8_b_black = mempty & textSpec . style8 . background8
+  . unwrapped . unwrapped .~ (Just (Just T.Black))
 
-color8_b_blue :: Background8
-color8_b_blue = Background8 $ Just T.Blue
+color8_b_red :: Chunk
+color8_b_red = mempty & textSpec . style8 . background8
+  . unwrapped . unwrapped .~ (Just (Just T.Red))
 
-color8_b_magenta :: Background8
-color8_b_magenta = Background8 $ Just T.Magenta
+color8_b_green :: Chunk
+color8_b_green = mempty & textSpec . style8 . background8
+  . unwrapped . unwrapped .~ (Just (Just T.Green))
 
-color8_b_cyan :: Background8
-color8_b_cyan = Background8 $ Just T.Cyan
+color8_b_yellow :: Chunk
+color8_b_yellow = mempty & textSpec . style8 . background8
+  . unwrapped . unwrapped .~ (Just (Just T.Yellow))
 
-color8_b_white :: Background8
-color8_b_white = Background8 $ Just T.White
+color8_b_blue :: Chunk
+color8_b_blue = mempty & textSpec . style8 . background8
+  . unwrapped . unwrapped .~ (Just (Just T.Blue))
 
-color256_f_default :: Foreground256
-color256_f_default = Foreground256 Nothing
+color8_b_magenta :: Chunk
+color8_b_magenta = mempty & textSpec . style8 . background8
+  . unwrapped . unwrapped .~ (Just (Just T.Magenta))
 
-color256_f_0 :: Foreground256
-color256_f_0 = Foreground256 (Just (T.ColorNumber 0))
+color8_b_cyan :: Chunk
+color8_b_cyan = mempty & textSpec . style8 . background8
+  . unwrapped . unwrapped .~ (Just (Just T.Cyan))
 
-color256_f_black :: Foreground256
-color256_f_black = Foreground256 (Just (T.ColorNumber 0))
+color8_b_white :: Chunk
+color8_b_white = mempty & textSpec . style8 . background8
+  . unwrapped . unwrapped .~ (Just (Just T.White))
 
-color256_f_1 :: Foreground256
-color256_f_1 = Foreground256 (Just (T.ColorNumber 1))
 
-color256_f_red :: Foreground256
-color256_f_red = Foreground256 (Just (T.ColorNumber 1))
+color256_f_default :: Chunk
+color256_f_default = mempty & textSpec . style256 . foreground256
+                            . unwrapped . unwrapped .~ (Just Nothing)
 
-color256_f_2 :: Foreground256
-color256_f_2 = Foreground256 (Just (T.ColorNumber 2))
 
-color256_f_green :: Foreground256
-color256_f_green = Foreground256 (Just (T.ColorNumber 2))
+color256_f_0 :: Chunk
+color256_f_0 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 0)))
 
-color256_f_3 :: Foreground256
-color256_f_3 = Foreground256 (Just (T.ColorNumber 3))
+color256_f_black :: Chunk
+color256_f_black = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 0)))
 
-color256_f_yellow :: Foreground256
-color256_f_yellow = Foreground256 (Just (T.ColorNumber 3))
+color256_f_1 :: Chunk
+color256_f_1 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 1)))
 
-color256_f_4 :: Foreground256
-color256_f_4 = Foreground256 (Just (T.ColorNumber 4))
+color256_f_red :: Chunk
+color256_f_red = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 1)))
 
-color256_f_blue :: Foreground256
-color256_f_blue = Foreground256 (Just (T.ColorNumber 4))
+color256_f_2 :: Chunk
+color256_f_2 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 2)))
 
-color256_f_5 :: Foreground256
-color256_f_5 = Foreground256 (Just (T.ColorNumber 5))
+color256_f_green :: Chunk
+color256_f_green = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 2)))
 
-color256_f_magenta :: Foreground256
-color256_f_magenta = Foreground256 (Just (T.ColorNumber 5))
+color256_f_3 :: Chunk
+color256_f_3 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 3)))
 
-color256_f_6 :: Foreground256
-color256_f_6 = Foreground256 (Just (T.ColorNumber 6))
+color256_f_yellow :: Chunk
+color256_f_yellow = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 3)))
 
-color256_f_cyan :: Foreground256
-color256_f_cyan = Foreground256 (Just (T.ColorNumber 6))
+color256_f_4 :: Chunk
+color256_f_4 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 4)))
 
-color256_f_7 :: Foreground256
-color256_f_7 = Foreground256 (Just (T.ColorNumber 7))
+color256_f_blue :: Chunk
+color256_f_blue = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 4)))
 
-color256_f_white :: Foreground256
-color256_f_white = Foreground256 (Just (T.ColorNumber 7))
+color256_f_5 :: Chunk
+color256_f_5 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 5)))
 
-color256_f_8 :: Foreground256
-color256_f_8 = Foreground256 (Just (T.ColorNumber 8))
+color256_f_magenta :: Chunk
+color256_f_magenta = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 5)))
 
-color256_f_grey :: Foreground256
-color256_f_grey = Foreground256 (Just (T.ColorNumber 8))
+color256_f_6 :: Chunk
+color256_f_6 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 6)))
 
-color256_f_9 :: Foreground256
-color256_f_9 = Foreground256 (Just (T.ColorNumber 9))
+color256_f_cyan :: Chunk
+color256_f_cyan = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 6)))
 
-color256_f_red_bright :: Foreground256
-color256_f_red_bright = Foreground256 (Just (T.ColorNumber 9))
+color256_f_7 :: Chunk
+color256_f_7 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 7)))
 
-color256_f_10 :: Foreground256
-color256_f_10 = Foreground256 (Just (T.ColorNumber 10))
+color256_f_white :: Chunk
+color256_f_white = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 7)))
 
-color256_f_green_bright :: Foreground256
-color256_f_green_bright = Foreground256 (Just (T.ColorNumber 10))
+color256_f_8 :: Chunk
+color256_f_8 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 8)))
 
-color256_f_11 :: Foreground256
-color256_f_11 = Foreground256 (Just (T.ColorNumber 11))
+color256_f_grey :: Chunk
+color256_f_grey = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 8)))
 
-color256_f_yellow_bright :: Foreground256
-color256_f_yellow_bright = Foreground256 (Just (T.ColorNumber 11))
+color256_f_9 :: Chunk
+color256_f_9 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 9)))
 
-color256_f_12 :: Foreground256
-color256_f_12 = Foreground256 (Just (T.ColorNumber 12))
+color256_f_red_bright :: Chunk
+color256_f_red_bright = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 9)))
 
-color256_f_blue_bright :: Foreground256
-color256_f_blue_bright = Foreground256 (Just (T.ColorNumber 12))
+color256_f_10 :: Chunk
+color256_f_10 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 10)))
 
-color256_f_13 :: Foreground256
-color256_f_13 = Foreground256 (Just (T.ColorNumber 13))
+color256_f_green_bright :: Chunk
+color256_f_green_bright = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 10)))
 
-color256_f_magenta_bright :: Foreground256
-color256_f_magenta_bright = Foreground256 (Just (T.ColorNumber 13))
+color256_f_11 :: Chunk
+color256_f_11 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 11)))
 
-color256_f_14 :: Foreground256
-color256_f_14 = Foreground256 (Just (T.ColorNumber 14))
+color256_f_yellow_bright :: Chunk
+color256_f_yellow_bright = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 11)))
 
-color256_f_cyan_bright :: Foreground256
-color256_f_cyan_bright = Foreground256 (Just (T.ColorNumber 14))
+color256_f_12 :: Chunk
+color256_f_12 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 12)))
 
-color256_f_15 :: Foreground256
-color256_f_15 = Foreground256 (Just (T.ColorNumber 15))
+color256_f_blue_bright :: Chunk
+color256_f_blue_bright = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 12)))
 
-color256_f_white_bright :: Foreground256
-color256_f_white_bright = Foreground256 (Just (T.ColorNumber 15))
+color256_f_13 :: Chunk
+color256_f_13 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 13)))
 
-color256_f_16 :: Foreground256
-color256_f_16 = Foreground256 (Just (T.ColorNumber 16))
+color256_f_magenta_bright :: Chunk
+color256_f_magenta_bright = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 13)))
 
-color256_f_17 :: Foreground256
-color256_f_17 = Foreground256 (Just (T.ColorNumber 17))
+color256_f_14 :: Chunk
+color256_f_14 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 14)))
 
-color256_f_18 :: Foreground256
-color256_f_18 = Foreground256 (Just (T.ColorNumber 18))
+color256_f_cyan_bright :: Chunk
+color256_f_cyan_bright = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 14)))
 
-color256_f_19 :: Foreground256
-color256_f_19 = Foreground256 (Just (T.ColorNumber 19))
+color256_f_15 :: Chunk
+color256_f_15 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 15)))
 
-color256_f_20 :: Foreground256
-color256_f_20 = Foreground256 (Just (T.ColorNumber 20))
+color256_f_white_bright :: Chunk
+color256_f_white_bright = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 15)))
 
-color256_f_21 :: Foreground256
-color256_f_21 = Foreground256 (Just (T.ColorNumber 21))
+color256_f_16 :: Chunk
+color256_f_16 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 16)))
 
-color256_f_22 :: Foreground256
-color256_f_22 = Foreground256 (Just (T.ColorNumber 22))
+color256_f_17 :: Chunk
+color256_f_17 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 17)))
 
-color256_f_23 :: Foreground256
-color256_f_23 = Foreground256 (Just (T.ColorNumber 23))
+color256_f_18 :: Chunk
+color256_f_18 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 18)))
 
-color256_f_24 :: Foreground256
-color256_f_24 = Foreground256 (Just (T.ColorNumber 24))
+color256_f_19 :: Chunk
+color256_f_19 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 19)))
 
-color256_f_25 :: Foreground256
-color256_f_25 = Foreground256 (Just (T.ColorNumber 25))
+color256_f_20 :: Chunk
+color256_f_20 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 20)))
 
-color256_f_26 :: Foreground256
-color256_f_26 = Foreground256 (Just (T.ColorNumber 26))
+color256_f_21 :: Chunk
+color256_f_21 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 21)))
 
-color256_f_27 :: Foreground256
-color256_f_27 = Foreground256 (Just (T.ColorNumber 27))
+color256_f_22 :: Chunk
+color256_f_22 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 22)))
 
-color256_f_28 :: Foreground256
-color256_f_28 = Foreground256 (Just (T.ColorNumber 28))
+color256_f_23 :: Chunk
+color256_f_23 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 23)))
 
-color256_f_29 :: Foreground256
-color256_f_29 = Foreground256 (Just (T.ColorNumber 29))
+color256_f_24 :: Chunk
+color256_f_24 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 24)))
 
-color256_f_30 :: Foreground256
-color256_f_30 = Foreground256 (Just (T.ColorNumber 30))
+color256_f_25 :: Chunk
+color256_f_25 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 25)))
 
-color256_f_31 :: Foreground256
-color256_f_31 = Foreground256 (Just (T.ColorNumber 31))
+color256_f_26 :: Chunk
+color256_f_26 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 26)))
 
-color256_f_32 :: Foreground256
-color256_f_32 = Foreground256 (Just (T.ColorNumber 32))
+color256_f_27 :: Chunk
+color256_f_27 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 27)))
 
-color256_f_33 :: Foreground256
-color256_f_33 = Foreground256 (Just (T.ColorNumber 33))
+color256_f_28 :: Chunk
+color256_f_28 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 28)))
 
-color256_f_34 :: Foreground256
-color256_f_34 = Foreground256 (Just (T.ColorNumber 34))
+color256_f_29 :: Chunk
+color256_f_29 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 29)))
 
-color256_f_35 :: Foreground256
-color256_f_35 = Foreground256 (Just (T.ColorNumber 35))
+color256_f_30 :: Chunk
+color256_f_30 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 30)))
 
-color256_f_36 :: Foreground256
-color256_f_36 = Foreground256 (Just (T.ColorNumber 36))
+color256_f_31 :: Chunk
+color256_f_31 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 31)))
 
-color256_f_37 :: Foreground256
-color256_f_37 = Foreground256 (Just (T.ColorNumber 37))
+color256_f_32 :: Chunk
+color256_f_32 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 32)))
 
-color256_f_38 :: Foreground256
-color256_f_38 = Foreground256 (Just (T.ColorNumber 38))
+color256_f_33 :: Chunk
+color256_f_33 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 33)))
 
-color256_f_39 :: Foreground256
-color256_f_39 = Foreground256 (Just (T.ColorNumber 39))
+color256_f_34 :: Chunk
+color256_f_34 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 34)))
 
-color256_f_40 :: Foreground256
-color256_f_40 = Foreground256 (Just (T.ColorNumber 40))
+color256_f_35 :: Chunk
+color256_f_35 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 35)))
 
-color256_f_41 :: Foreground256
-color256_f_41 = Foreground256 (Just (T.ColorNumber 41))
+color256_f_36 :: Chunk
+color256_f_36 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 36)))
 
-color256_f_42 :: Foreground256
-color256_f_42 = Foreground256 (Just (T.ColorNumber 42))
+color256_f_37 :: Chunk
+color256_f_37 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 37)))
 
-color256_f_43 :: Foreground256
-color256_f_43 = Foreground256 (Just (T.ColorNumber 43))
+color256_f_38 :: Chunk
+color256_f_38 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 38)))
 
-color256_f_44 :: Foreground256
-color256_f_44 = Foreground256 (Just (T.ColorNumber 44))
+color256_f_39 :: Chunk
+color256_f_39 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 39)))
 
-color256_f_45 :: Foreground256
-color256_f_45 = Foreground256 (Just (T.ColorNumber 45))
+color256_f_40 :: Chunk
+color256_f_40 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 40)))
 
-color256_f_46 :: Foreground256
-color256_f_46 = Foreground256 (Just (T.ColorNumber 46))
+color256_f_41 :: Chunk
+color256_f_41 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 41)))
 
-color256_f_47 :: Foreground256
-color256_f_47 = Foreground256 (Just (T.ColorNumber 47))
+color256_f_42 :: Chunk
+color256_f_42 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 42)))
 
-color256_f_48 :: Foreground256
-color256_f_48 = Foreground256 (Just (T.ColorNumber 48))
+color256_f_43 :: Chunk
+color256_f_43 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 43)))
 
-color256_f_49 :: Foreground256
-color256_f_49 = Foreground256 (Just (T.ColorNumber 49))
+color256_f_44 :: Chunk
+color256_f_44 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 44)))
 
-color256_f_50 :: Foreground256
-color256_f_50 = Foreground256 (Just (T.ColorNumber 50))
+color256_f_45 :: Chunk
+color256_f_45 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 45)))
 
-color256_f_51 :: Foreground256
-color256_f_51 = Foreground256 (Just (T.ColorNumber 51))
+color256_f_46 :: Chunk
+color256_f_46 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 46)))
 
-color256_f_52 :: Foreground256
-color256_f_52 = Foreground256 (Just (T.ColorNumber 52))
+color256_f_47 :: Chunk
+color256_f_47 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 47)))
 
-color256_f_53 :: Foreground256
-color256_f_53 = Foreground256 (Just (T.ColorNumber 53))
+color256_f_48 :: Chunk
+color256_f_48 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 48)))
 
-color256_f_54 :: Foreground256
-color256_f_54 = Foreground256 (Just (T.ColorNumber 54))
+color256_f_49 :: Chunk
+color256_f_49 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 49)))
 
-color256_f_55 :: Foreground256
-color256_f_55 = Foreground256 (Just (T.ColorNumber 55))
+color256_f_50 :: Chunk
+color256_f_50 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 50)))
 
-color256_f_56 :: Foreground256
-color256_f_56 = Foreground256 (Just (T.ColorNumber 56))
+color256_f_51 :: Chunk
+color256_f_51 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 51)))
 
-color256_f_57 :: Foreground256
-color256_f_57 = Foreground256 (Just (T.ColorNumber 57))
+color256_f_52 :: Chunk
+color256_f_52 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 52)))
 
-color256_f_58 :: Foreground256
-color256_f_58 = Foreground256 (Just (T.ColorNumber 58))
+color256_f_53 :: Chunk
+color256_f_53 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 53)))
 
-color256_f_59 :: Foreground256
-color256_f_59 = Foreground256 (Just (T.ColorNumber 59))
+color256_f_54 :: Chunk
+color256_f_54 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 54)))
 
-color256_f_60 :: Foreground256
-color256_f_60 = Foreground256 (Just (T.ColorNumber 60))
+color256_f_55 :: Chunk
+color256_f_55 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 55)))
 
-color256_f_61 :: Foreground256
-color256_f_61 = Foreground256 (Just (T.ColorNumber 61))
+color256_f_56 :: Chunk
+color256_f_56 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 56)))
 
-color256_f_62 :: Foreground256
-color256_f_62 = Foreground256 (Just (T.ColorNumber 62))
+color256_f_57 :: Chunk
+color256_f_57 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 57)))
 
-color256_f_63 :: Foreground256
-color256_f_63 = Foreground256 (Just (T.ColorNumber 63))
+color256_f_58 :: Chunk
+color256_f_58 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 58)))
 
-color256_f_64 :: Foreground256
-color256_f_64 = Foreground256 (Just (T.ColorNumber 64))
+color256_f_59 :: Chunk
+color256_f_59 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 59)))
 
-color256_f_65 :: Foreground256
-color256_f_65 = Foreground256 (Just (T.ColorNumber 65))
+color256_f_60 :: Chunk
+color256_f_60 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 60)))
 
-color256_f_66 :: Foreground256
-color256_f_66 = Foreground256 (Just (T.ColorNumber 66))
+color256_f_61 :: Chunk
+color256_f_61 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 61)))
 
-color256_f_67 :: Foreground256
-color256_f_67 = Foreground256 (Just (T.ColorNumber 67))
+color256_f_62 :: Chunk
+color256_f_62 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 62)))
 
-color256_f_68 :: Foreground256
-color256_f_68 = Foreground256 (Just (T.ColorNumber 68))
+color256_f_63 :: Chunk
+color256_f_63 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 63)))
 
-color256_f_69 :: Foreground256
-color256_f_69 = Foreground256 (Just (T.ColorNumber 69))
+color256_f_64 :: Chunk
+color256_f_64 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 64)))
 
-color256_f_70 :: Foreground256
-color256_f_70 = Foreground256 (Just (T.ColorNumber 70))
+color256_f_65 :: Chunk
+color256_f_65 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 65)))
 
-color256_f_71 :: Foreground256
-color256_f_71 = Foreground256 (Just (T.ColorNumber 71))
+color256_f_66 :: Chunk
+color256_f_66 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 66)))
 
-color256_f_72 :: Foreground256
-color256_f_72 = Foreground256 (Just (T.ColorNumber 72))
+color256_f_67 :: Chunk
+color256_f_67 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 67)))
 
-color256_f_73 :: Foreground256
-color256_f_73 = Foreground256 (Just (T.ColorNumber 73))
+color256_f_68 :: Chunk
+color256_f_68 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 68)))
 
-color256_f_74 :: Foreground256
-color256_f_74 = Foreground256 (Just (T.ColorNumber 74))
+color256_f_69 :: Chunk
+color256_f_69 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 69)))
 
-color256_f_75 :: Foreground256
-color256_f_75 = Foreground256 (Just (T.ColorNumber 75))
+color256_f_70 :: Chunk
+color256_f_70 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 70)))
 
-color256_f_76 :: Foreground256
-color256_f_76 = Foreground256 (Just (T.ColorNumber 76))
+color256_f_71 :: Chunk
+color256_f_71 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 71)))
 
-color256_f_77 :: Foreground256
-color256_f_77 = Foreground256 (Just (T.ColorNumber 77))
+color256_f_72 :: Chunk
+color256_f_72 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 72)))
 
-color256_f_78 :: Foreground256
-color256_f_78 = Foreground256 (Just (T.ColorNumber 78))
+color256_f_73 :: Chunk
+color256_f_73 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 73)))
 
-color256_f_79 :: Foreground256
-color256_f_79 = Foreground256 (Just (T.ColorNumber 79))
+color256_f_74 :: Chunk
+color256_f_74 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 74)))
 
-color256_f_80 :: Foreground256
-color256_f_80 = Foreground256 (Just (T.ColorNumber 80))
+color256_f_75 :: Chunk
+color256_f_75 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 75)))
 
-color256_f_81 :: Foreground256
-color256_f_81 = Foreground256 (Just (T.ColorNumber 81))
+color256_f_76 :: Chunk
+color256_f_76 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 76)))
 
-color256_f_82 :: Foreground256
-color256_f_82 = Foreground256 (Just (T.ColorNumber 82))
+color256_f_77 :: Chunk
+color256_f_77 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 77)))
 
-color256_f_83 :: Foreground256
-color256_f_83 = Foreground256 (Just (T.ColorNumber 83))
+color256_f_78 :: Chunk
+color256_f_78 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 78)))
 
-color256_f_84 :: Foreground256
-color256_f_84 = Foreground256 (Just (T.ColorNumber 84))
+color256_f_79 :: Chunk
+color256_f_79 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 79)))
 
-color256_f_85 :: Foreground256
-color256_f_85 = Foreground256 (Just (T.ColorNumber 85))
+color256_f_80 :: Chunk
+color256_f_80 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 80)))
 
-color256_f_86 :: Foreground256
-color256_f_86 = Foreground256 (Just (T.ColorNumber 86))
+color256_f_81 :: Chunk
+color256_f_81 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 81)))
 
-color256_f_87 :: Foreground256
-color256_f_87 = Foreground256 (Just (T.ColorNumber 87))
+color256_f_82 :: Chunk
+color256_f_82 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 82)))
 
-color256_f_88 :: Foreground256
-color256_f_88 = Foreground256 (Just (T.ColorNumber 88))
+color256_f_83 :: Chunk
+color256_f_83 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 83)))
 
-color256_f_89 :: Foreground256
-color256_f_89 = Foreground256 (Just (T.ColorNumber 89))
+color256_f_84 :: Chunk
+color256_f_84 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 84)))
 
-color256_f_90 :: Foreground256
-color256_f_90 = Foreground256 (Just (T.ColorNumber 90))
+color256_f_85 :: Chunk
+color256_f_85 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 85)))
 
-color256_f_91 :: Foreground256
-color256_f_91 = Foreground256 (Just (T.ColorNumber 91))
+color256_f_86 :: Chunk
+color256_f_86 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 86)))
 
-color256_f_92 :: Foreground256
-color256_f_92 = Foreground256 (Just (T.ColorNumber 92))
+color256_f_87 :: Chunk
+color256_f_87 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 87)))
 
-color256_f_93 :: Foreground256
-color256_f_93 = Foreground256 (Just (T.ColorNumber 93))
+color256_f_88 :: Chunk
+color256_f_88 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 88)))
 
-color256_f_94 :: Foreground256
-color256_f_94 = Foreground256 (Just (T.ColorNumber 94))
+color256_f_89 :: Chunk
+color256_f_89 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 89)))
 
-color256_f_95 :: Foreground256
-color256_f_95 = Foreground256 (Just (T.ColorNumber 95))
+color256_f_90 :: Chunk
+color256_f_90 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 90)))
 
-color256_f_96 :: Foreground256
-color256_f_96 = Foreground256 (Just (T.ColorNumber 96))
+color256_f_91 :: Chunk
+color256_f_91 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 91)))
 
-color256_f_97 :: Foreground256
-color256_f_97 = Foreground256 (Just (T.ColorNumber 97))
+color256_f_92 :: Chunk
+color256_f_92 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 92)))
 
-color256_f_98 :: Foreground256
-color256_f_98 = Foreground256 (Just (T.ColorNumber 98))
+color256_f_93 :: Chunk
+color256_f_93 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 93)))
 
-color256_f_99 :: Foreground256
-color256_f_99 = Foreground256 (Just (T.ColorNumber 99))
+color256_f_94 :: Chunk
+color256_f_94 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 94)))
 
-color256_f_100 :: Foreground256
-color256_f_100 = Foreground256 (Just (T.ColorNumber 100))
+color256_f_95 :: Chunk
+color256_f_95 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 95)))
 
-color256_f_101 :: Foreground256
-color256_f_101 = Foreground256 (Just (T.ColorNumber 101))
+color256_f_96 :: Chunk
+color256_f_96 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 96)))
 
-color256_f_102 :: Foreground256
-color256_f_102 = Foreground256 (Just (T.ColorNumber 102))
+color256_f_97 :: Chunk
+color256_f_97 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 97)))
 
-color256_f_103 :: Foreground256
-color256_f_103 = Foreground256 (Just (T.ColorNumber 103))
+color256_f_98 :: Chunk
+color256_f_98 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 98)))
 
-color256_f_104 :: Foreground256
-color256_f_104 = Foreground256 (Just (T.ColorNumber 104))
+color256_f_99 :: Chunk
+color256_f_99 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 99)))
 
-color256_f_105 :: Foreground256
-color256_f_105 = Foreground256 (Just (T.ColorNumber 105))
+color256_f_100 :: Chunk
+color256_f_100 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 100)))
 
-color256_f_106 :: Foreground256
-color256_f_106 = Foreground256 (Just (T.ColorNumber 106))
+color256_f_101 :: Chunk
+color256_f_101 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 101)))
 
-color256_f_107 :: Foreground256
-color256_f_107 = Foreground256 (Just (T.ColorNumber 107))
+color256_f_102 :: Chunk
+color256_f_102 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 102)))
 
-color256_f_108 :: Foreground256
-color256_f_108 = Foreground256 (Just (T.ColorNumber 108))
+color256_f_103 :: Chunk
+color256_f_103 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 103)))
 
-color256_f_109 :: Foreground256
-color256_f_109 = Foreground256 (Just (T.ColorNumber 109))
+color256_f_104 :: Chunk
+color256_f_104 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 104)))
 
-color256_f_110 :: Foreground256
-color256_f_110 = Foreground256 (Just (T.ColorNumber 110))
+color256_f_105 :: Chunk
+color256_f_105 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 105)))
 
-color256_f_111 :: Foreground256
-color256_f_111 = Foreground256 (Just (T.ColorNumber 111))
+color256_f_106 :: Chunk
+color256_f_106 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 106)))
 
-color256_f_112 :: Foreground256
-color256_f_112 = Foreground256 (Just (T.ColorNumber 112))
+color256_f_107 :: Chunk
+color256_f_107 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 107)))
 
-color256_f_113 :: Foreground256
-color256_f_113 = Foreground256 (Just (T.ColorNumber 113))
+color256_f_108 :: Chunk
+color256_f_108 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 108)))
 
-color256_f_114 :: Foreground256
-color256_f_114 = Foreground256 (Just (T.ColorNumber 114))
+color256_f_109 :: Chunk
+color256_f_109 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 109)))
 
-color256_f_115 :: Foreground256
-color256_f_115 = Foreground256 (Just (T.ColorNumber 115))
+color256_f_110 :: Chunk
+color256_f_110 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 110)))
 
-color256_f_116 :: Foreground256
-color256_f_116 = Foreground256 (Just (T.ColorNumber 116))
+color256_f_111 :: Chunk
+color256_f_111 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 111)))
 
-color256_f_117 :: Foreground256
-color256_f_117 = Foreground256 (Just (T.ColorNumber 117))
+color256_f_112 :: Chunk
+color256_f_112 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 112)))
 
-color256_f_118 :: Foreground256
-color256_f_118 = Foreground256 (Just (T.ColorNumber 118))
+color256_f_113 :: Chunk
+color256_f_113 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 113)))
 
-color256_f_119 :: Foreground256
-color256_f_119 = Foreground256 (Just (T.ColorNumber 119))
+color256_f_114 :: Chunk
+color256_f_114 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 114)))
 
-color256_f_120 :: Foreground256
-color256_f_120 = Foreground256 (Just (T.ColorNumber 120))
+color256_f_115 :: Chunk
+color256_f_115 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 115)))
 
-color256_f_121 :: Foreground256
-color256_f_121 = Foreground256 (Just (T.ColorNumber 121))
+color256_f_116 :: Chunk
+color256_f_116 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 116)))
 
-color256_f_122 :: Foreground256
-color256_f_122 = Foreground256 (Just (T.ColorNumber 122))
+color256_f_117 :: Chunk
+color256_f_117 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 117)))
 
-color256_f_123 :: Foreground256
-color256_f_123 = Foreground256 (Just (T.ColorNumber 123))
+color256_f_118 :: Chunk
+color256_f_118 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 118)))
 
-color256_f_124 :: Foreground256
-color256_f_124 = Foreground256 (Just (T.ColorNumber 124))
+color256_f_119 :: Chunk
+color256_f_119 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 119)))
 
-color256_f_125 :: Foreground256
-color256_f_125 = Foreground256 (Just (T.ColorNumber 125))
+color256_f_120 :: Chunk
+color256_f_120 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 120)))
 
-color256_f_126 :: Foreground256
-color256_f_126 = Foreground256 (Just (T.ColorNumber 126))
+color256_f_121 :: Chunk
+color256_f_121 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 121)))
 
-color256_f_127 :: Foreground256
-color256_f_127 = Foreground256 (Just (T.ColorNumber 127))
+color256_f_122 :: Chunk
+color256_f_122 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 122)))
 
-color256_f_128 :: Foreground256
-color256_f_128 = Foreground256 (Just (T.ColorNumber 128))
+color256_f_123 :: Chunk
+color256_f_123 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 123)))
 
-color256_f_129 :: Foreground256
-color256_f_129 = Foreground256 (Just (T.ColorNumber 129))
+color256_f_124 :: Chunk
+color256_f_124 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 124)))
 
-color256_f_130 :: Foreground256
-color256_f_130 = Foreground256 (Just (T.ColorNumber 130))
+color256_f_125 :: Chunk
+color256_f_125 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 125)))
 
-color256_f_131 :: Foreground256
-color256_f_131 = Foreground256 (Just (T.ColorNumber 131))
+color256_f_126 :: Chunk
+color256_f_126 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 126)))
 
-color256_f_132 :: Foreground256
-color256_f_132 = Foreground256 (Just (T.ColorNumber 132))
+color256_f_127 :: Chunk
+color256_f_127 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 127)))
 
-color256_f_133 :: Foreground256
-color256_f_133 = Foreground256 (Just (T.ColorNumber 133))
+color256_f_128 :: Chunk
+color256_f_128 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 128)))
 
-color256_f_134 :: Foreground256
-color256_f_134 = Foreground256 (Just (T.ColorNumber 134))
+color256_f_129 :: Chunk
+color256_f_129 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 129)))
 
-color256_f_135 :: Foreground256
-color256_f_135 = Foreground256 (Just (T.ColorNumber 135))
+color256_f_130 :: Chunk
+color256_f_130 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 130)))
 
-color256_f_136 :: Foreground256
-color256_f_136 = Foreground256 (Just (T.ColorNumber 136))
+color256_f_131 :: Chunk
+color256_f_131 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 131)))
 
-color256_f_137 :: Foreground256
-color256_f_137 = Foreground256 (Just (T.ColorNumber 137))
+color256_f_132 :: Chunk
+color256_f_132 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 132)))
 
-color256_f_138 :: Foreground256
-color256_f_138 = Foreground256 (Just (T.ColorNumber 138))
+color256_f_133 :: Chunk
+color256_f_133 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 133)))
 
-color256_f_139 :: Foreground256
-color256_f_139 = Foreground256 (Just (T.ColorNumber 139))
+color256_f_134 :: Chunk
+color256_f_134 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 134)))
 
-color256_f_140 :: Foreground256
-color256_f_140 = Foreground256 (Just (T.ColorNumber 140))
+color256_f_135 :: Chunk
+color256_f_135 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 135)))
 
-color256_f_141 :: Foreground256
-color256_f_141 = Foreground256 (Just (T.ColorNumber 141))
+color256_f_136 :: Chunk
+color256_f_136 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 136)))
 
-color256_f_142 :: Foreground256
-color256_f_142 = Foreground256 (Just (T.ColorNumber 142))
+color256_f_137 :: Chunk
+color256_f_137 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 137)))
 
-color256_f_143 :: Foreground256
-color256_f_143 = Foreground256 (Just (T.ColorNumber 143))
+color256_f_138 :: Chunk
+color256_f_138 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 138)))
 
-color256_f_144 :: Foreground256
-color256_f_144 = Foreground256 (Just (T.ColorNumber 144))
+color256_f_139 :: Chunk
+color256_f_139 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 139)))
 
-color256_f_145 :: Foreground256
-color256_f_145 = Foreground256 (Just (T.ColorNumber 145))
+color256_f_140 :: Chunk
+color256_f_140 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 140)))
 
-color256_f_146 :: Foreground256
-color256_f_146 = Foreground256 (Just (T.ColorNumber 146))
+color256_f_141 :: Chunk
+color256_f_141 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 141)))
 
-color256_f_147 :: Foreground256
-color256_f_147 = Foreground256 (Just (T.ColorNumber 147))
+color256_f_142 :: Chunk
+color256_f_142 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 142)))
 
-color256_f_148 :: Foreground256
-color256_f_148 = Foreground256 (Just (T.ColorNumber 148))
+color256_f_143 :: Chunk
+color256_f_143 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 143)))
 
-color256_f_149 :: Foreground256
-color256_f_149 = Foreground256 (Just (T.ColorNumber 149))
+color256_f_144 :: Chunk
+color256_f_144 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 144)))
 
-color256_f_150 :: Foreground256
-color256_f_150 = Foreground256 (Just (T.ColorNumber 150))
+color256_f_145 :: Chunk
+color256_f_145 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 145)))
 
-color256_f_151 :: Foreground256
-color256_f_151 = Foreground256 (Just (T.ColorNumber 151))
+color256_f_146 :: Chunk
+color256_f_146 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 146)))
 
-color256_f_152 :: Foreground256
-color256_f_152 = Foreground256 (Just (T.ColorNumber 152))
+color256_f_147 :: Chunk
+color256_f_147 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 147)))
 
-color256_f_153 :: Foreground256
-color256_f_153 = Foreground256 (Just (T.ColorNumber 153))
+color256_f_148 :: Chunk
+color256_f_148 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 148)))
 
-color256_f_154 :: Foreground256
-color256_f_154 = Foreground256 (Just (T.ColorNumber 154))
+color256_f_149 :: Chunk
+color256_f_149 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 149)))
 
-color256_f_155 :: Foreground256
-color256_f_155 = Foreground256 (Just (T.ColorNumber 155))
+color256_f_150 :: Chunk
+color256_f_150 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 150)))
 
-color256_f_156 :: Foreground256
-color256_f_156 = Foreground256 (Just (T.ColorNumber 156))
+color256_f_151 :: Chunk
+color256_f_151 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 151)))
 
-color256_f_157 :: Foreground256
-color256_f_157 = Foreground256 (Just (T.ColorNumber 157))
+color256_f_152 :: Chunk
+color256_f_152 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 152)))
 
-color256_f_158 :: Foreground256
-color256_f_158 = Foreground256 (Just (T.ColorNumber 158))
+color256_f_153 :: Chunk
+color256_f_153 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 153)))
 
-color256_f_159 :: Foreground256
-color256_f_159 = Foreground256 (Just (T.ColorNumber 159))
+color256_f_154 :: Chunk
+color256_f_154 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 154)))
 
-color256_f_160 :: Foreground256
-color256_f_160 = Foreground256 (Just (T.ColorNumber 160))
+color256_f_155 :: Chunk
+color256_f_155 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 155)))
 
-color256_f_161 :: Foreground256
-color256_f_161 = Foreground256 (Just (T.ColorNumber 161))
+color256_f_156 :: Chunk
+color256_f_156 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 156)))
 
-color256_f_162 :: Foreground256
-color256_f_162 = Foreground256 (Just (T.ColorNumber 162))
+color256_f_157 :: Chunk
+color256_f_157 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 157)))
 
-color256_f_163 :: Foreground256
-color256_f_163 = Foreground256 (Just (T.ColorNumber 163))
+color256_f_158 :: Chunk
+color256_f_158 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 158)))
 
-color256_f_164 :: Foreground256
-color256_f_164 = Foreground256 (Just (T.ColorNumber 164))
+color256_f_159 :: Chunk
+color256_f_159 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 159)))
 
-color256_f_165 :: Foreground256
-color256_f_165 = Foreground256 (Just (T.ColorNumber 165))
+color256_f_160 :: Chunk
+color256_f_160 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 160)))
 
-color256_f_166 :: Foreground256
-color256_f_166 = Foreground256 (Just (T.ColorNumber 166))
+color256_f_161 :: Chunk
+color256_f_161 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 161)))
 
-color256_f_167 :: Foreground256
-color256_f_167 = Foreground256 (Just (T.ColorNumber 167))
+color256_f_162 :: Chunk
+color256_f_162 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 162)))
 
-color256_f_168 :: Foreground256
-color256_f_168 = Foreground256 (Just (T.ColorNumber 168))
+color256_f_163 :: Chunk
+color256_f_163 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 163)))
 
-color256_f_169 :: Foreground256
-color256_f_169 = Foreground256 (Just (T.ColorNumber 169))
+color256_f_164 :: Chunk
+color256_f_164 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 164)))
 
-color256_f_170 :: Foreground256
-color256_f_170 = Foreground256 (Just (T.ColorNumber 170))
+color256_f_165 :: Chunk
+color256_f_165 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 165)))
 
-color256_f_171 :: Foreground256
-color256_f_171 = Foreground256 (Just (T.ColorNumber 171))
+color256_f_166 :: Chunk
+color256_f_166 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 166)))
 
-color256_f_172 :: Foreground256
-color256_f_172 = Foreground256 (Just (T.ColorNumber 172))
+color256_f_167 :: Chunk
+color256_f_167 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 167)))
 
-color256_f_173 :: Foreground256
-color256_f_173 = Foreground256 (Just (T.ColorNumber 173))
+color256_f_168 :: Chunk
+color256_f_168 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 168)))
 
-color256_f_174 :: Foreground256
-color256_f_174 = Foreground256 (Just (T.ColorNumber 174))
+color256_f_169 :: Chunk
+color256_f_169 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 169)))
 
-color256_f_175 :: Foreground256
-color256_f_175 = Foreground256 (Just (T.ColorNumber 175))
+color256_f_170 :: Chunk
+color256_f_170 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 170)))
 
-color256_f_176 :: Foreground256
-color256_f_176 = Foreground256 (Just (T.ColorNumber 176))
+color256_f_171 :: Chunk
+color256_f_171 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 171)))
 
-color256_f_177 :: Foreground256
-color256_f_177 = Foreground256 (Just (T.ColorNumber 177))
+color256_f_172 :: Chunk
+color256_f_172 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 172)))
 
-color256_f_178 :: Foreground256
-color256_f_178 = Foreground256 (Just (T.ColorNumber 178))
+color256_f_173 :: Chunk
+color256_f_173 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 173)))
 
-color256_f_179 :: Foreground256
-color256_f_179 = Foreground256 (Just (T.ColorNumber 179))
+color256_f_174 :: Chunk
+color256_f_174 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 174)))
 
-color256_f_180 :: Foreground256
-color256_f_180 = Foreground256 (Just (T.ColorNumber 180))
+color256_f_175 :: Chunk
+color256_f_175 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 175)))
 
-color256_f_181 :: Foreground256
-color256_f_181 = Foreground256 (Just (T.ColorNumber 181))
+color256_f_176 :: Chunk
+color256_f_176 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 176)))
 
-color256_f_182 :: Foreground256
-color256_f_182 = Foreground256 (Just (T.ColorNumber 182))
+color256_f_177 :: Chunk
+color256_f_177 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 177)))
 
-color256_f_183 :: Foreground256
-color256_f_183 = Foreground256 (Just (T.ColorNumber 183))
+color256_f_178 :: Chunk
+color256_f_178 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 178)))
 
-color256_f_184 :: Foreground256
-color256_f_184 = Foreground256 (Just (T.ColorNumber 184))
+color256_f_179 :: Chunk
+color256_f_179 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 179)))
 
-color256_f_185 :: Foreground256
-color256_f_185 = Foreground256 (Just (T.ColorNumber 185))
+color256_f_180 :: Chunk
+color256_f_180 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 180)))
 
-color256_f_186 :: Foreground256
-color256_f_186 = Foreground256 (Just (T.ColorNumber 186))
+color256_f_181 :: Chunk
+color256_f_181 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 181)))
 
-color256_f_187 :: Foreground256
-color256_f_187 = Foreground256 (Just (T.ColorNumber 187))
+color256_f_182 :: Chunk
+color256_f_182 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 182)))
 
-color256_f_188 :: Foreground256
-color256_f_188 = Foreground256 (Just (T.ColorNumber 188))
+color256_f_183 :: Chunk
+color256_f_183 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 183)))
 
-color256_f_189 :: Foreground256
-color256_f_189 = Foreground256 (Just (T.ColorNumber 189))
+color256_f_184 :: Chunk
+color256_f_184 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 184)))
 
-color256_f_190 :: Foreground256
-color256_f_190 = Foreground256 (Just (T.ColorNumber 190))
+color256_f_185 :: Chunk
+color256_f_185 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 185)))
 
-color256_f_191 :: Foreground256
-color256_f_191 = Foreground256 (Just (T.ColorNumber 191))
+color256_f_186 :: Chunk
+color256_f_186 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 186)))
 
-color256_f_192 :: Foreground256
-color256_f_192 = Foreground256 (Just (T.ColorNumber 192))
+color256_f_187 :: Chunk
+color256_f_187 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 187)))
 
-color256_f_193 :: Foreground256
-color256_f_193 = Foreground256 (Just (T.ColorNumber 193))
+color256_f_188 :: Chunk
+color256_f_188 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 188)))
 
-color256_f_194 :: Foreground256
-color256_f_194 = Foreground256 (Just (T.ColorNumber 194))
+color256_f_189 :: Chunk
+color256_f_189 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 189)))
 
-color256_f_195 :: Foreground256
-color256_f_195 = Foreground256 (Just (T.ColorNumber 195))
+color256_f_190 :: Chunk
+color256_f_190 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 190)))
 
-color256_f_196 :: Foreground256
-color256_f_196 = Foreground256 (Just (T.ColorNumber 196))
+color256_f_191 :: Chunk
+color256_f_191 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 191)))
 
-color256_f_197 :: Foreground256
-color256_f_197 = Foreground256 (Just (T.ColorNumber 197))
+color256_f_192 :: Chunk
+color256_f_192 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 192)))
 
-color256_f_198 :: Foreground256
-color256_f_198 = Foreground256 (Just (T.ColorNumber 198))
+color256_f_193 :: Chunk
+color256_f_193 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 193)))
 
-color256_f_199 :: Foreground256
-color256_f_199 = Foreground256 (Just (T.ColorNumber 199))
+color256_f_194 :: Chunk
+color256_f_194 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 194)))
 
-color256_f_200 :: Foreground256
-color256_f_200 = Foreground256 (Just (T.ColorNumber 200))
+color256_f_195 :: Chunk
+color256_f_195 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 195)))
 
-color256_f_201 :: Foreground256
-color256_f_201 = Foreground256 (Just (T.ColorNumber 201))
+color256_f_196 :: Chunk
+color256_f_196 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 196)))
 
-color256_f_202 :: Foreground256
-color256_f_202 = Foreground256 (Just (T.ColorNumber 202))
+color256_f_197 :: Chunk
+color256_f_197 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 197)))
 
-color256_f_203 :: Foreground256
-color256_f_203 = Foreground256 (Just (T.ColorNumber 203))
+color256_f_198 :: Chunk
+color256_f_198 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 198)))
 
-color256_f_204 :: Foreground256
-color256_f_204 = Foreground256 (Just (T.ColorNumber 204))
+color256_f_199 :: Chunk
+color256_f_199 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 199)))
 
-color256_f_205 :: Foreground256
-color256_f_205 = Foreground256 (Just (T.ColorNumber 205))
+color256_f_200 :: Chunk
+color256_f_200 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 200)))
 
-color256_f_206 :: Foreground256
-color256_f_206 = Foreground256 (Just (T.ColorNumber 206))
+color256_f_201 :: Chunk
+color256_f_201 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 201)))
 
-color256_f_207 :: Foreground256
-color256_f_207 = Foreground256 (Just (T.ColorNumber 207))
+color256_f_202 :: Chunk
+color256_f_202 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 202)))
 
-color256_f_208 :: Foreground256
-color256_f_208 = Foreground256 (Just (T.ColorNumber 208))
+color256_f_203 :: Chunk
+color256_f_203 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 203)))
 
-color256_f_209 :: Foreground256
-color256_f_209 = Foreground256 (Just (T.ColorNumber 209))
+color256_f_204 :: Chunk
+color256_f_204 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 204)))
 
-color256_f_210 :: Foreground256
-color256_f_210 = Foreground256 (Just (T.ColorNumber 210))
+color256_f_205 :: Chunk
+color256_f_205 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 205)))
 
-color256_f_211 :: Foreground256
-color256_f_211 = Foreground256 (Just (T.ColorNumber 211))
+color256_f_206 :: Chunk
+color256_f_206 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 206)))
 
-color256_f_212 :: Foreground256
-color256_f_212 = Foreground256 (Just (T.ColorNumber 212))
+color256_f_207 :: Chunk
+color256_f_207 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 207)))
 
-color256_f_213 :: Foreground256
-color256_f_213 = Foreground256 (Just (T.ColorNumber 213))
+color256_f_208 :: Chunk
+color256_f_208 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 208)))
 
-color256_f_214 :: Foreground256
-color256_f_214 = Foreground256 (Just (T.ColorNumber 214))
+color256_f_209 :: Chunk
+color256_f_209 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 209)))
 
-color256_f_215 :: Foreground256
-color256_f_215 = Foreground256 (Just (T.ColorNumber 215))
+color256_f_210 :: Chunk
+color256_f_210 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 210)))
 
-color256_f_216 :: Foreground256
-color256_f_216 = Foreground256 (Just (T.ColorNumber 216))
+color256_f_211 :: Chunk
+color256_f_211 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 211)))
 
-color256_f_217 :: Foreground256
-color256_f_217 = Foreground256 (Just (T.ColorNumber 217))
+color256_f_212 :: Chunk
+color256_f_212 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 212)))
 
-color256_f_218 :: Foreground256
-color256_f_218 = Foreground256 (Just (T.ColorNumber 218))
+color256_f_213 :: Chunk
+color256_f_213 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 213)))
 
-color256_f_219 :: Foreground256
-color256_f_219 = Foreground256 (Just (T.ColorNumber 219))
+color256_f_214 :: Chunk
+color256_f_214 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 214)))
 
-color256_f_220 :: Foreground256
-color256_f_220 = Foreground256 (Just (T.ColorNumber 220))
+color256_f_215 :: Chunk
+color256_f_215 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 215)))
 
-color256_f_221 :: Foreground256
-color256_f_221 = Foreground256 (Just (T.ColorNumber 221))
+color256_f_216 :: Chunk
+color256_f_216 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 216)))
 
-color256_f_222 :: Foreground256
-color256_f_222 = Foreground256 (Just (T.ColorNumber 222))
+color256_f_217 :: Chunk
+color256_f_217 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 217)))
 
-color256_f_223 :: Foreground256
-color256_f_223 = Foreground256 (Just (T.ColorNumber 223))
+color256_f_218 :: Chunk
+color256_f_218 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 218)))
 
-color256_f_224 :: Foreground256
-color256_f_224 = Foreground256 (Just (T.ColorNumber 224))
+color256_f_219 :: Chunk
+color256_f_219 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 219)))
 
-color256_f_225 :: Foreground256
-color256_f_225 = Foreground256 (Just (T.ColorNumber 225))
+color256_f_220 :: Chunk
+color256_f_220 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 220)))
 
-color256_f_226 :: Foreground256
-color256_f_226 = Foreground256 (Just (T.ColorNumber 226))
+color256_f_221 :: Chunk
+color256_f_221 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 221)))
 
-color256_f_227 :: Foreground256
-color256_f_227 = Foreground256 (Just (T.ColorNumber 227))
+color256_f_222 :: Chunk
+color256_f_222 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 222)))
 
-color256_f_228 :: Foreground256
-color256_f_228 = Foreground256 (Just (T.ColorNumber 228))
+color256_f_223 :: Chunk
+color256_f_223 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 223)))
 
-color256_f_229 :: Foreground256
-color256_f_229 = Foreground256 (Just (T.ColorNumber 229))
+color256_f_224 :: Chunk
+color256_f_224 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 224)))
 
-color256_f_230 :: Foreground256
-color256_f_230 = Foreground256 (Just (T.ColorNumber 230))
+color256_f_225 :: Chunk
+color256_f_225 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 225)))
 
-color256_f_231 :: Foreground256
-color256_f_231 = Foreground256 (Just (T.ColorNumber 231))
+color256_f_226 :: Chunk
+color256_f_226 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 226)))
 
-color256_f_232 :: Foreground256
-color256_f_232 = Foreground256 (Just (T.ColorNumber 232))
+color256_f_227 :: Chunk
+color256_f_227 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 227)))
 
-color256_f_233 :: Foreground256
-color256_f_233 = Foreground256 (Just (T.ColorNumber 233))
+color256_f_228 :: Chunk
+color256_f_228 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 228)))
 
-color256_f_234 :: Foreground256
-color256_f_234 = Foreground256 (Just (T.ColorNumber 234))
+color256_f_229 :: Chunk
+color256_f_229 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 229)))
 
-color256_f_235 :: Foreground256
-color256_f_235 = Foreground256 (Just (T.ColorNumber 235))
+color256_f_230 :: Chunk
+color256_f_230 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 230)))
 
-color256_f_236 :: Foreground256
-color256_f_236 = Foreground256 (Just (T.ColorNumber 236))
+color256_f_231 :: Chunk
+color256_f_231 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 231)))
 
-color256_f_237 :: Foreground256
-color256_f_237 = Foreground256 (Just (T.ColorNumber 237))
+color256_f_232 :: Chunk
+color256_f_232 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 232)))
 
-color256_f_238 :: Foreground256
-color256_f_238 = Foreground256 (Just (T.ColorNumber 238))
+color256_f_233 :: Chunk
+color256_f_233 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 233)))
 
-color256_f_239 :: Foreground256
-color256_f_239 = Foreground256 (Just (T.ColorNumber 239))
+color256_f_234 :: Chunk
+color256_f_234 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 234)))
 
-color256_f_240 :: Foreground256
-color256_f_240 = Foreground256 (Just (T.ColorNumber 240))
+color256_f_235 :: Chunk
+color256_f_235 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 235)))
 
-color256_f_241 :: Foreground256
-color256_f_241 = Foreground256 (Just (T.ColorNumber 241))
+color256_f_236 :: Chunk
+color256_f_236 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 236)))
 
-color256_f_242 :: Foreground256
-color256_f_242 = Foreground256 (Just (T.ColorNumber 242))
+color256_f_237 :: Chunk
+color256_f_237 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 237)))
 
-color256_f_243 :: Foreground256
-color256_f_243 = Foreground256 (Just (T.ColorNumber 243))
+color256_f_238 :: Chunk
+color256_f_238 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 238)))
 
-color256_f_244 :: Foreground256
-color256_f_244 = Foreground256 (Just (T.ColorNumber 244))
+color256_f_239 :: Chunk
+color256_f_239 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 239)))
 
-color256_f_245 :: Foreground256
-color256_f_245 = Foreground256 (Just (T.ColorNumber 245))
+color256_f_240 :: Chunk
+color256_f_240 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 240)))
 
-color256_f_246 :: Foreground256
-color256_f_246 = Foreground256 (Just (T.ColorNumber 246))
+color256_f_241 :: Chunk
+color256_f_241 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 241)))
 
-color256_f_247 :: Foreground256
-color256_f_247 = Foreground256 (Just (T.ColorNumber 247))
+color256_f_242 :: Chunk
+color256_f_242 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 242)))
 
-color256_f_248 :: Foreground256
-color256_f_248 = Foreground256 (Just (T.ColorNumber 248))
+color256_f_243 :: Chunk
+color256_f_243 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 243)))
 
-color256_f_249 :: Foreground256
-color256_f_249 = Foreground256 (Just (T.ColorNumber 249))
+color256_f_244 :: Chunk
+color256_f_244 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 244)))
 
-color256_f_250 :: Foreground256
-color256_f_250 = Foreground256 (Just (T.ColorNumber 250))
+color256_f_245 :: Chunk
+color256_f_245 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 245)))
 
-color256_f_251 :: Foreground256
-color256_f_251 = Foreground256 (Just (T.ColorNumber 251))
+color256_f_246 :: Chunk
+color256_f_246 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 246)))
 
-color256_f_252 :: Foreground256
-color256_f_252 = Foreground256 (Just (T.ColorNumber 252))
+color256_f_247 :: Chunk
+color256_f_247 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 247)))
 
-color256_f_253 :: Foreground256
-color256_f_253 = Foreground256 (Just (T.ColorNumber 253))
+color256_f_248 :: Chunk
+color256_f_248 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 248)))
 
-color256_f_254 :: Foreground256
-color256_f_254 = Foreground256 (Just (T.ColorNumber 254))
+color256_f_249 :: Chunk
+color256_f_249 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 249)))
 
-color256_f_255 :: Foreground256
-color256_f_255 = Foreground256 (Just (T.ColorNumber 255))
+color256_f_250 :: Chunk
+color256_f_250 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 250)))
 
-color256_b_default :: Background256
-color256_b_default = Background256 Nothing
+color256_f_251 :: Chunk
+color256_f_251 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 251)))
 
-color256_b_0 :: Background256
-color256_b_0 = Background256 (Just (T.ColorNumber 0))
+color256_f_252 :: Chunk
+color256_f_252 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 252)))
 
-color256_b_black :: Background256
-color256_b_black = Background256 (Just (T.ColorNumber 0))
+color256_f_253 :: Chunk
+color256_f_253 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 253)))
 
-color256_b_1 :: Background256
-color256_b_1 = Background256 (Just (T.ColorNumber 1))
+color256_f_254 :: Chunk
+color256_f_254 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 254)))
 
-color256_b_red :: Background256
-color256_b_red = Background256 (Just (T.ColorNumber 1))
+color256_f_255 :: Chunk
+color256_f_255 = mempty & textSpec . style256 . foreground256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 255)))
 
-color256_b_2 :: Background256
-color256_b_2 = Background256 (Just (T.ColorNumber 2))
 
-color256_b_green :: Background256
-color256_b_green = Background256 (Just (T.ColorNumber 2))
+color256_b_default :: Chunk
+color256_b_default = mempty & textSpec . style256 . background256
+                            . unwrapped . unwrapped .~ (Just Nothing)
 
-color256_b_3 :: Background256
-color256_b_3 = Background256 (Just (T.ColorNumber 3))
+color256_b_0 :: Chunk
+color256_b_0 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 0)))
 
-color256_b_yellow :: Background256
-color256_b_yellow = Background256 (Just (T.ColorNumber 3))
+color256_b_black :: Chunk
+color256_b_black = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 0)))
 
-color256_b_4 :: Background256
-color256_b_4 = Background256 (Just (T.ColorNumber 4))
+color256_b_1 :: Chunk
+color256_b_1 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 1)))
 
-color256_b_blue :: Background256
-color256_b_blue = Background256 (Just (T.ColorNumber 4))
+color256_b_red :: Chunk
+color256_b_red = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 1)))
 
-color256_b_5 :: Background256
-color256_b_5 = Background256 (Just (T.ColorNumber 5))
+color256_b_2 :: Chunk
+color256_b_2 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 2)))
 
-color256_b_magenta :: Background256
-color256_b_magenta = Background256 (Just (T.ColorNumber 5))
+color256_b_green :: Chunk
+color256_b_green = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 2)))
 
-color256_b_6 :: Background256
-color256_b_6 = Background256 (Just (T.ColorNumber 6))
+color256_b_3 :: Chunk
+color256_b_3 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 3)))
 
-color256_b_cyan :: Background256
-color256_b_cyan = Background256 (Just (T.ColorNumber 6))
+color256_b_yellow :: Chunk
+color256_b_yellow = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 3)))
 
-color256_b_7 :: Background256
-color256_b_7 = Background256 (Just (T.ColorNumber 7))
+color256_b_4 :: Chunk
+color256_b_4 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 4)))
 
-color256_b_white :: Background256
-color256_b_white = Background256 (Just (T.ColorNumber 7))
+color256_b_blue :: Chunk
+color256_b_blue = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 4)))
 
-color256_b_8 :: Background256
-color256_b_8 = Background256 (Just (T.ColorNumber 8))
+color256_b_5 :: Chunk
+color256_b_5 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 5)))
 
-color256_b_grey :: Background256
-color256_b_grey = Background256 (Just (T.ColorNumber 8))
+color256_b_magenta :: Chunk
+color256_b_magenta = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 5)))
 
-color256_b_9 :: Background256
-color256_b_9 = Background256 (Just (T.ColorNumber 9))
+color256_b_6 :: Chunk
+color256_b_6 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 6)))
 
-color256_b_red_bright :: Background256
-color256_b_red_bright = Background256 (Just (T.ColorNumber 9))
+color256_b_cyan :: Chunk
+color256_b_cyan = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 6)))
 
-color256_b_10 :: Background256
-color256_b_10 = Background256 (Just (T.ColorNumber 10))
+color256_b_7 :: Chunk
+color256_b_7 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 7)))
 
-color256_b_green_bright :: Background256
-color256_b_green_bright = Background256 (Just (T.ColorNumber 10))
+color256_b_white :: Chunk
+color256_b_white = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 7)))
 
-color256_b_11 :: Background256
-color256_b_11 = Background256 (Just (T.ColorNumber 11))
+color256_b_8 :: Chunk
+color256_b_8 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 8)))
 
-color256_b_yellow_bright :: Background256
-color256_b_yellow_bright = Background256 (Just (T.ColorNumber 11))
+color256_b_grey :: Chunk
+color256_b_grey = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 8)))
 
-color256_b_12 :: Background256
-color256_b_12 = Background256 (Just (T.ColorNumber 12))
+color256_b_9 :: Chunk
+color256_b_9 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 9)))
 
-color256_b_blue_bright :: Background256
-color256_b_blue_bright = Background256 (Just (T.ColorNumber 12))
+color256_b_red_bright :: Chunk
+color256_b_red_bright = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 9)))
 
-color256_b_13 :: Background256
-color256_b_13 = Background256 (Just (T.ColorNumber 13))
+color256_b_10 :: Chunk
+color256_b_10 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 10)))
 
-color256_b_magenta_bright :: Background256
-color256_b_magenta_bright = Background256 (Just (T.ColorNumber 13))
+color256_b_green_bright :: Chunk
+color256_b_green_bright = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 10)))
 
-color256_b_14 :: Background256
-color256_b_14 = Background256 (Just (T.ColorNumber 14))
+color256_b_11 :: Chunk
+color256_b_11 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 11)))
 
-color256_b_cyan_bright :: Background256
-color256_b_cyan_bright = Background256 (Just (T.ColorNumber 14))
+color256_b_yellow_bright :: Chunk
+color256_b_yellow_bright = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 11)))
 
-color256_b_15 :: Background256
-color256_b_15 = Background256 (Just (T.ColorNumber 15))
+color256_b_12 :: Chunk
+color256_b_12 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 12)))
 
-color256_b_white_bright :: Background256
-color256_b_white_bright = Background256 (Just (T.ColorNumber 15))
+color256_b_blue_bright :: Chunk
+color256_b_blue_bright = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 12)))
 
-color256_b_16 :: Background256
-color256_b_16 = Background256 (Just (T.ColorNumber 16))
+color256_b_13 :: Chunk
+color256_b_13 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 13)))
 
-color256_b_17 :: Background256
-color256_b_17 = Background256 (Just (T.ColorNumber 17))
+color256_b_magenta_bright :: Chunk
+color256_b_magenta_bright = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 13)))
 
-color256_b_18 :: Background256
-color256_b_18 = Background256 (Just (T.ColorNumber 18))
+color256_b_14 :: Chunk
+color256_b_14 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 14)))
 
-color256_b_19 :: Background256
-color256_b_19 = Background256 (Just (T.ColorNumber 19))
+color256_b_cyan_bright :: Chunk
+color256_b_cyan_bright = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 14)))
 
-color256_b_20 :: Background256
-color256_b_20 = Background256 (Just (T.ColorNumber 20))
+color256_b_15 :: Chunk
+color256_b_15 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 15)))
 
-color256_b_21 :: Background256
-color256_b_21 = Background256 (Just (T.ColorNumber 21))
+color256_b_white_bright :: Chunk
+color256_b_white_bright = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 15)))
 
-color256_b_22 :: Background256
-color256_b_22 = Background256 (Just (T.ColorNumber 22))
+color256_b_16 :: Chunk
+color256_b_16 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 16)))
 
-color256_b_23 :: Background256
-color256_b_23 = Background256 (Just (T.ColorNumber 23))
+color256_b_17 :: Chunk
+color256_b_17 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 17)))
 
-color256_b_24 :: Background256
-color256_b_24 = Background256 (Just (T.ColorNumber 24))
+color256_b_18 :: Chunk
+color256_b_18 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 18)))
 
-color256_b_25 :: Background256
-color256_b_25 = Background256 (Just (T.ColorNumber 25))
+color256_b_19 :: Chunk
+color256_b_19 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 19)))
 
-color256_b_26 :: Background256
-color256_b_26 = Background256 (Just (T.ColorNumber 26))
+color256_b_20 :: Chunk
+color256_b_20 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 20)))
 
-color256_b_27 :: Background256
-color256_b_27 = Background256 (Just (T.ColorNumber 27))
+color256_b_21 :: Chunk
+color256_b_21 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 21)))
 
-color256_b_28 :: Background256
-color256_b_28 = Background256 (Just (T.ColorNumber 28))
+color256_b_22 :: Chunk
+color256_b_22 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 22)))
 
-color256_b_29 :: Background256
-color256_b_29 = Background256 (Just (T.ColorNumber 29))
+color256_b_23 :: Chunk
+color256_b_23 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 23)))
 
-color256_b_30 :: Background256
-color256_b_30 = Background256 (Just (T.ColorNumber 30))
+color256_b_24 :: Chunk
+color256_b_24 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 24)))
 
-color256_b_31 :: Background256
-color256_b_31 = Background256 (Just (T.ColorNumber 31))
+color256_b_25 :: Chunk
+color256_b_25 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 25)))
 
-color256_b_32 :: Background256
-color256_b_32 = Background256 (Just (T.ColorNumber 32))
+color256_b_26 :: Chunk
+color256_b_26 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 26)))
 
-color256_b_33 :: Background256
-color256_b_33 = Background256 (Just (T.ColorNumber 33))
+color256_b_27 :: Chunk
+color256_b_27 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 27)))
 
-color256_b_34 :: Background256
-color256_b_34 = Background256 (Just (T.ColorNumber 34))
+color256_b_28 :: Chunk
+color256_b_28 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 28)))
 
-color256_b_35 :: Background256
-color256_b_35 = Background256 (Just (T.ColorNumber 35))
+color256_b_29 :: Chunk
+color256_b_29 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 29)))
 
-color256_b_36 :: Background256
-color256_b_36 = Background256 (Just (T.ColorNumber 36))
+color256_b_30 :: Chunk
+color256_b_30 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 30)))
 
-color256_b_37 :: Background256
-color256_b_37 = Background256 (Just (T.ColorNumber 37))
+color256_b_31 :: Chunk
+color256_b_31 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 31)))
 
-color256_b_38 :: Background256
-color256_b_38 = Background256 (Just (T.ColorNumber 38))
+color256_b_32 :: Chunk
+color256_b_32 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 32)))
 
-color256_b_39 :: Background256
-color256_b_39 = Background256 (Just (T.ColorNumber 39))
+color256_b_33 :: Chunk
+color256_b_33 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 33)))
 
-color256_b_40 :: Background256
-color256_b_40 = Background256 (Just (T.ColorNumber 40))
+color256_b_34 :: Chunk
+color256_b_34 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 34)))
 
-color256_b_41 :: Background256
-color256_b_41 = Background256 (Just (T.ColorNumber 41))
+color256_b_35 :: Chunk
+color256_b_35 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 35)))
 
-color256_b_42 :: Background256
-color256_b_42 = Background256 (Just (T.ColorNumber 42))
+color256_b_36 :: Chunk
+color256_b_36 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 36)))
 
-color256_b_43 :: Background256
-color256_b_43 = Background256 (Just (T.ColorNumber 43))
+color256_b_37 :: Chunk
+color256_b_37 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 37)))
 
-color256_b_44 :: Background256
-color256_b_44 = Background256 (Just (T.ColorNumber 44))
+color256_b_38 :: Chunk
+color256_b_38 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 38)))
 
-color256_b_45 :: Background256
-color256_b_45 = Background256 (Just (T.ColorNumber 45))
+color256_b_39 :: Chunk
+color256_b_39 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 39)))
 
-color256_b_46 :: Background256
-color256_b_46 = Background256 (Just (T.ColorNumber 46))
+color256_b_40 :: Chunk
+color256_b_40 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 40)))
 
-color256_b_47 :: Background256
-color256_b_47 = Background256 (Just (T.ColorNumber 47))
+color256_b_41 :: Chunk
+color256_b_41 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 41)))
 
-color256_b_48 :: Background256
-color256_b_48 = Background256 (Just (T.ColorNumber 48))
+color256_b_42 :: Chunk
+color256_b_42 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 42)))
 
-color256_b_49 :: Background256
-color256_b_49 = Background256 (Just (T.ColorNumber 49))
+color256_b_43 :: Chunk
+color256_b_43 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 43)))
 
-color256_b_50 :: Background256
-color256_b_50 = Background256 (Just (T.ColorNumber 50))
+color256_b_44 :: Chunk
+color256_b_44 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 44)))
 
-color256_b_51 :: Background256
-color256_b_51 = Background256 (Just (T.ColorNumber 51))
+color256_b_45 :: Chunk
+color256_b_45 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 45)))
 
-color256_b_52 :: Background256
-color256_b_52 = Background256 (Just (T.ColorNumber 52))
+color256_b_46 :: Chunk
+color256_b_46 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 46)))
 
-color256_b_53 :: Background256
-color256_b_53 = Background256 (Just (T.ColorNumber 53))
+color256_b_47 :: Chunk
+color256_b_47 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 47)))
 
-color256_b_54 :: Background256
-color256_b_54 = Background256 (Just (T.ColorNumber 54))
+color256_b_48 :: Chunk
+color256_b_48 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 48)))
 
-color256_b_55 :: Background256
-color256_b_55 = Background256 (Just (T.ColorNumber 55))
+color256_b_49 :: Chunk
+color256_b_49 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 49)))
 
-color256_b_56 :: Background256
-color256_b_56 = Background256 (Just (T.ColorNumber 56))
+color256_b_50 :: Chunk
+color256_b_50 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 50)))
 
-color256_b_57 :: Background256
-color256_b_57 = Background256 (Just (T.ColorNumber 57))
+color256_b_51 :: Chunk
+color256_b_51 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 51)))
 
-color256_b_58 :: Background256
-color256_b_58 = Background256 (Just (T.ColorNumber 58))
+color256_b_52 :: Chunk
+color256_b_52 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 52)))
 
-color256_b_59 :: Background256
-color256_b_59 = Background256 (Just (T.ColorNumber 59))
+color256_b_53 :: Chunk
+color256_b_53 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 53)))
 
-color256_b_60 :: Background256
-color256_b_60 = Background256 (Just (T.ColorNumber 60))
+color256_b_54 :: Chunk
+color256_b_54 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 54)))
 
-color256_b_61 :: Background256
-color256_b_61 = Background256 (Just (T.ColorNumber 61))
+color256_b_55 :: Chunk
+color256_b_55 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 55)))
 
-color256_b_62 :: Background256
-color256_b_62 = Background256 (Just (T.ColorNumber 62))
+color256_b_56 :: Chunk
+color256_b_56 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 56)))
 
-color256_b_63 :: Background256
-color256_b_63 = Background256 (Just (T.ColorNumber 63))
+color256_b_57 :: Chunk
+color256_b_57 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 57)))
 
-color256_b_64 :: Background256
-color256_b_64 = Background256 (Just (T.ColorNumber 64))
+color256_b_58 :: Chunk
+color256_b_58 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 58)))
 
-color256_b_65 :: Background256
-color256_b_65 = Background256 (Just (T.ColorNumber 65))
+color256_b_59 :: Chunk
+color256_b_59 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 59)))
 
-color256_b_66 :: Background256
-color256_b_66 = Background256 (Just (T.ColorNumber 66))
+color256_b_60 :: Chunk
+color256_b_60 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 60)))
 
-color256_b_67 :: Background256
-color256_b_67 = Background256 (Just (T.ColorNumber 67))
+color256_b_61 :: Chunk
+color256_b_61 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 61)))
 
-color256_b_68 :: Background256
-color256_b_68 = Background256 (Just (T.ColorNumber 68))
+color256_b_62 :: Chunk
+color256_b_62 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 62)))
 
-color256_b_69 :: Background256
-color256_b_69 = Background256 (Just (T.ColorNumber 69))
+color256_b_63 :: Chunk
+color256_b_63 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 63)))
 
-color256_b_70 :: Background256
-color256_b_70 = Background256 (Just (T.ColorNumber 70))
+color256_b_64 :: Chunk
+color256_b_64 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 64)))
 
-color256_b_71 :: Background256
-color256_b_71 = Background256 (Just (T.ColorNumber 71))
+color256_b_65 :: Chunk
+color256_b_65 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 65)))
 
-color256_b_72 :: Background256
-color256_b_72 = Background256 (Just (T.ColorNumber 72))
+color256_b_66 :: Chunk
+color256_b_66 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 66)))
 
-color256_b_73 :: Background256
-color256_b_73 = Background256 (Just (T.ColorNumber 73))
+color256_b_67 :: Chunk
+color256_b_67 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 67)))
 
-color256_b_74 :: Background256
-color256_b_74 = Background256 (Just (T.ColorNumber 74))
+color256_b_68 :: Chunk
+color256_b_68 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 68)))
 
-color256_b_75 :: Background256
-color256_b_75 = Background256 (Just (T.ColorNumber 75))
+color256_b_69 :: Chunk
+color256_b_69 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 69)))
 
-color256_b_76 :: Background256
-color256_b_76 = Background256 (Just (T.ColorNumber 76))
+color256_b_70 :: Chunk
+color256_b_70 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 70)))
 
-color256_b_77 :: Background256
-color256_b_77 = Background256 (Just (T.ColorNumber 77))
+color256_b_71 :: Chunk
+color256_b_71 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 71)))
 
-color256_b_78 :: Background256
-color256_b_78 = Background256 (Just (T.ColorNumber 78))
+color256_b_72 :: Chunk
+color256_b_72 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 72)))
 
-color256_b_79 :: Background256
-color256_b_79 = Background256 (Just (T.ColorNumber 79))
+color256_b_73 :: Chunk
+color256_b_73 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 73)))
 
-color256_b_80 :: Background256
-color256_b_80 = Background256 (Just (T.ColorNumber 80))
+color256_b_74 :: Chunk
+color256_b_74 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 74)))
 
-color256_b_81 :: Background256
-color256_b_81 = Background256 (Just (T.ColorNumber 81))
+color256_b_75 :: Chunk
+color256_b_75 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 75)))
 
-color256_b_82 :: Background256
-color256_b_82 = Background256 (Just (T.ColorNumber 82))
+color256_b_76 :: Chunk
+color256_b_76 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 76)))
 
-color256_b_83 :: Background256
-color256_b_83 = Background256 (Just (T.ColorNumber 83))
+color256_b_77 :: Chunk
+color256_b_77 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 77)))
 
-color256_b_84 :: Background256
-color256_b_84 = Background256 (Just (T.ColorNumber 84))
+color256_b_78 :: Chunk
+color256_b_78 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 78)))
 
-color256_b_85 :: Background256
-color256_b_85 = Background256 (Just (T.ColorNumber 85))
+color256_b_79 :: Chunk
+color256_b_79 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 79)))
 
-color256_b_86 :: Background256
-color256_b_86 = Background256 (Just (T.ColorNumber 86))
+color256_b_80 :: Chunk
+color256_b_80 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 80)))
 
-color256_b_87 :: Background256
-color256_b_87 = Background256 (Just (T.ColorNumber 87))
+color256_b_81 :: Chunk
+color256_b_81 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 81)))
 
-color256_b_88 :: Background256
-color256_b_88 = Background256 (Just (T.ColorNumber 88))
+color256_b_82 :: Chunk
+color256_b_82 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 82)))
 
-color256_b_89 :: Background256
-color256_b_89 = Background256 (Just (T.ColorNumber 89))
+color256_b_83 :: Chunk
+color256_b_83 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 83)))
 
-color256_b_90 :: Background256
-color256_b_90 = Background256 (Just (T.ColorNumber 90))
+color256_b_84 :: Chunk
+color256_b_84 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 84)))
 
-color256_b_91 :: Background256
-color256_b_91 = Background256 (Just (T.ColorNumber 91))
+color256_b_85 :: Chunk
+color256_b_85 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 85)))
 
-color256_b_92 :: Background256
-color256_b_92 = Background256 (Just (T.ColorNumber 92))
+color256_b_86 :: Chunk
+color256_b_86 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 86)))
 
-color256_b_93 :: Background256
-color256_b_93 = Background256 (Just (T.ColorNumber 93))
+color256_b_87 :: Chunk
+color256_b_87 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 87)))
 
-color256_b_94 :: Background256
-color256_b_94 = Background256 (Just (T.ColorNumber 94))
+color256_b_88 :: Chunk
+color256_b_88 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 88)))
 
-color256_b_95 :: Background256
-color256_b_95 = Background256 (Just (T.ColorNumber 95))
+color256_b_89 :: Chunk
+color256_b_89 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 89)))
 
-color256_b_96 :: Background256
-color256_b_96 = Background256 (Just (T.ColorNumber 96))
+color256_b_90 :: Chunk
+color256_b_90 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 90)))
 
-color256_b_97 :: Background256
-color256_b_97 = Background256 (Just (T.ColorNumber 97))
+color256_b_91 :: Chunk
+color256_b_91 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 91)))
 
-color256_b_98 :: Background256
-color256_b_98 = Background256 (Just (T.ColorNumber 98))
+color256_b_92 :: Chunk
+color256_b_92 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 92)))
 
-color256_b_99 :: Background256
-color256_b_99 = Background256 (Just (T.ColorNumber 99))
+color256_b_93 :: Chunk
+color256_b_93 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 93)))
 
-color256_b_100 :: Background256
-color256_b_100 = Background256 (Just (T.ColorNumber 100))
+color256_b_94 :: Chunk
+color256_b_94 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 94)))
 
-color256_b_101 :: Background256
-color256_b_101 = Background256 (Just (T.ColorNumber 101))
+color256_b_95 :: Chunk
+color256_b_95 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 95)))
 
-color256_b_102 :: Background256
-color256_b_102 = Background256 (Just (T.ColorNumber 102))
+color256_b_96 :: Chunk
+color256_b_96 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 96)))
 
-color256_b_103 :: Background256
-color256_b_103 = Background256 (Just (T.ColorNumber 103))
+color256_b_97 :: Chunk
+color256_b_97 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 97)))
 
-color256_b_104 :: Background256
-color256_b_104 = Background256 (Just (T.ColorNumber 104))
+color256_b_98 :: Chunk
+color256_b_98 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 98)))
 
-color256_b_105 :: Background256
-color256_b_105 = Background256 (Just (T.ColorNumber 105))
+color256_b_99 :: Chunk
+color256_b_99 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 99)))
 
-color256_b_106 :: Background256
-color256_b_106 = Background256 (Just (T.ColorNumber 106))
+color256_b_100 :: Chunk
+color256_b_100 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 100)))
 
-color256_b_107 :: Background256
-color256_b_107 = Background256 (Just (T.ColorNumber 107))
+color256_b_101 :: Chunk
+color256_b_101 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 101)))
 
-color256_b_108 :: Background256
-color256_b_108 = Background256 (Just (T.ColorNumber 108))
+color256_b_102 :: Chunk
+color256_b_102 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 102)))
 
-color256_b_109 :: Background256
-color256_b_109 = Background256 (Just (T.ColorNumber 109))
+color256_b_103 :: Chunk
+color256_b_103 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 103)))
 
-color256_b_110 :: Background256
-color256_b_110 = Background256 (Just (T.ColorNumber 110))
+color256_b_104 :: Chunk
+color256_b_104 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 104)))
 
-color256_b_111 :: Background256
-color256_b_111 = Background256 (Just (T.ColorNumber 111))
+color256_b_105 :: Chunk
+color256_b_105 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 105)))
 
-color256_b_112 :: Background256
-color256_b_112 = Background256 (Just (T.ColorNumber 112))
+color256_b_106 :: Chunk
+color256_b_106 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 106)))
 
-color256_b_113 :: Background256
-color256_b_113 = Background256 (Just (T.ColorNumber 113))
+color256_b_107 :: Chunk
+color256_b_107 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 107)))
 
-color256_b_114 :: Background256
-color256_b_114 = Background256 (Just (T.ColorNumber 114))
+color256_b_108 :: Chunk
+color256_b_108 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 108)))
 
-color256_b_115 :: Background256
-color256_b_115 = Background256 (Just (T.ColorNumber 115))
+color256_b_109 :: Chunk
+color256_b_109 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 109)))
 
-color256_b_116 :: Background256
-color256_b_116 = Background256 (Just (T.ColorNumber 116))
+color256_b_110 :: Chunk
+color256_b_110 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 110)))
 
-color256_b_117 :: Background256
-color256_b_117 = Background256 (Just (T.ColorNumber 117))
+color256_b_111 :: Chunk
+color256_b_111 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 111)))
 
-color256_b_118 :: Background256
-color256_b_118 = Background256 (Just (T.ColorNumber 118))
+color256_b_112 :: Chunk
+color256_b_112 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 112)))
 
-color256_b_119 :: Background256
-color256_b_119 = Background256 (Just (T.ColorNumber 119))
+color256_b_113 :: Chunk
+color256_b_113 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 113)))
 
-color256_b_120 :: Background256
-color256_b_120 = Background256 (Just (T.ColorNumber 120))
+color256_b_114 :: Chunk
+color256_b_114 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 114)))
 
-color256_b_121 :: Background256
-color256_b_121 = Background256 (Just (T.ColorNumber 121))
+color256_b_115 :: Chunk
+color256_b_115 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 115)))
 
-color256_b_122 :: Background256
-color256_b_122 = Background256 (Just (T.ColorNumber 122))
+color256_b_116 :: Chunk
+color256_b_116 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 116)))
 
-color256_b_123 :: Background256
-color256_b_123 = Background256 (Just (T.ColorNumber 123))
+color256_b_117 :: Chunk
+color256_b_117 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 117)))
 
-color256_b_124 :: Background256
-color256_b_124 = Background256 (Just (T.ColorNumber 124))
+color256_b_118 :: Chunk
+color256_b_118 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 118)))
 
-color256_b_125 :: Background256
-color256_b_125 = Background256 (Just (T.ColorNumber 125))
+color256_b_119 :: Chunk
+color256_b_119 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 119)))
 
-color256_b_126 :: Background256
-color256_b_126 = Background256 (Just (T.ColorNumber 126))
+color256_b_120 :: Chunk
+color256_b_120 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 120)))
 
-color256_b_127 :: Background256
-color256_b_127 = Background256 (Just (T.ColorNumber 127))
+color256_b_121 :: Chunk
+color256_b_121 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 121)))
 
-color256_b_128 :: Background256
-color256_b_128 = Background256 (Just (T.ColorNumber 128))
+color256_b_122 :: Chunk
+color256_b_122 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 122)))
 
-color256_b_129 :: Background256
-color256_b_129 = Background256 (Just (T.ColorNumber 129))
+color256_b_123 :: Chunk
+color256_b_123 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 123)))
 
-color256_b_130 :: Background256
-color256_b_130 = Background256 (Just (T.ColorNumber 130))
+color256_b_124 :: Chunk
+color256_b_124 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 124)))
 
-color256_b_131 :: Background256
-color256_b_131 = Background256 (Just (T.ColorNumber 131))
+color256_b_125 :: Chunk
+color256_b_125 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 125)))
 
-color256_b_132 :: Background256
-color256_b_132 = Background256 (Just (T.ColorNumber 132))
+color256_b_126 :: Chunk
+color256_b_126 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 126)))
 
-color256_b_133 :: Background256
-color256_b_133 = Background256 (Just (T.ColorNumber 133))
+color256_b_127 :: Chunk
+color256_b_127 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 127)))
 
-color256_b_134 :: Background256
-color256_b_134 = Background256 (Just (T.ColorNumber 134))
+color256_b_128 :: Chunk
+color256_b_128 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 128)))
 
-color256_b_135 :: Background256
-color256_b_135 = Background256 (Just (T.ColorNumber 135))
+color256_b_129 :: Chunk
+color256_b_129 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 129)))
 
-color256_b_136 :: Background256
-color256_b_136 = Background256 (Just (T.ColorNumber 136))
+color256_b_130 :: Chunk
+color256_b_130 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 130)))
 
-color256_b_137 :: Background256
-color256_b_137 = Background256 (Just (T.ColorNumber 137))
+color256_b_131 :: Chunk
+color256_b_131 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 131)))
 
-color256_b_138 :: Background256
-color256_b_138 = Background256 (Just (T.ColorNumber 138))
+color256_b_132 :: Chunk
+color256_b_132 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 132)))
 
-color256_b_139 :: Background256
-color256_b_139 = Background256 (Just (T.ColorNumber 139))
+color256_b_133 :: Chunk
+color256_b_133 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 133)))
 
-color256_b_140 :: Background256
-color256_b_140 = Background256 (Just (T.ColorNumber 140))
+color256_b_134 :: Chunk
+color256_b_134 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 134)))
 
-color256_b_141 :: Background256
-color256_b_141 = Background256 (Just (T.ColorNumber 141))
+color256_b_135 :: Chunk
+color256_b_135 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 135)))
 
-color256_b_142 :: Background256
-color256_b_142 = Background256 (Just (T.ColorNumber 142))
+color256_b_136 :: Chunk
+color256_b_136 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 136)))
 
-color256_b_143 :: Background256
-color256_b_143 = Background256 (Just (T.ColorNumber 143))
+color256_b_137 :: Chunk
+color256_b_137 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 137)))
 
-color256_b_144 :: Background256
-color256_b_144 = Background256 (Just (T.ColorNumber 144))
+color256_b_138 :: Chunk
+color256_b_138 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 138)))
 
-color256_b_145 :: Background256
-color256_b_145 = Background256 (Just (T.ColorNumber 145))
+color256_b_139 :: Chunk
+color256_b_139 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 139)))
 
-color256_b_146 :: Background256
-color256_b_146 = Background256 (Just (T.ColorNumber 146))
+color256_b_140 :: Chunk
+color256_b_140 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 140)))
 
-color256_b_147 :: Background256
-color256_b_147 = Background256 (Just (T.ColorNumber 147))
+color256_b_141 :: Chunk
+color256_b_141 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 141)))
 
-color256_b_148 :: Background256
-color256_b_148 = Background256 (Just (T.ColorNumber 148))
+color256_b_142 :: Chunk
+color256_b_142 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 142)))
 
-color256_b_149 :: Background256
-color256_b_149 = Background256 (Just (T.ColorNumber 149))
+color256_b_143 :: Chunk
+color256_b_143 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 143)))
 
-color256_b_150 :: Background256
-color256_b_150 = Background256 (Just (T.ColorNumber 150))
+color256_b_144 :: Chunk
+color256_b_144 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 144)))
 
-color256_b_151 :: Background256
-color256_b_151 = Background256 (Just (T.ColorNumber 151))
+color256_b_145 :: Chunk
+color256_b_145 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 145)))
 
-color256_b_152 :: Background256
-color256_b_152 = Background256 (Just (T.ColorNumber 152))
+color256_b_146 :: Chunk
+color256_b_146 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 146)))
 
-color256_b_153 :: Background256
-color256_b_153 = Background256 (Just (T.ColorNumber 153))
+color256_b_147 :: Chunk
+color256_b_147 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 147)))
 
-color256_b_154 :: Background256
-color256_b_154 = Background256 (Just (T.ColorNumber 154))
+color256_b_148 :: Chunk
+color256_b_148 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 148)))
 
-color256_b_155 :: Background256
-color256_b_155 = Background256 (Just (T.ColorNumber 155))
+color256_b_149 :: Chunk
+color256_b_149 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 149)))
 
-color256_b_156 :: Background256
-color256_b_156 = Background256 (Just (T.ColorNumber 156))
+color256_b_150 :: Chunk
+color256_b_150 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 150)))
 
-color256_b_157 :: Background256
-color256_b_157 = Background256 (Just (T.ColorNumber 157))
+color256_b_151 :: Chunk
+color256_b_151 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 151)))
 
-color256_b_158 :: Background256
-color256_b_158 = Background256 (Just (T.ColorNumber 158))
+color256_b_152 :: Chunk
+color256_b_152 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 152)))
 
-color256_b_159 :: Background256
-color256_b_159 = Background256 (Just (T.ColorNumber 159))
+color256_b_153 :: Chunk
+color256_b_153 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 153)))
 
-color256_b_160 :: Background256
-color256_b_160 = Background256 (Just (T.ColorNumber 160))
+color256_b_154 :: Chunk
+color256_b_154 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 154)))
 
-color256_b_161 :: Background256
-color256_b_161 = Background256 (Just (T.ColorNumber 161))
+color256_b_155 :: Chunk
+color256_b_155 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 155)))
 
-color256_b_162 :: Background256
-color256_b_162 = Background256 (Just (T.ColorNumber 162))
+color256_b_156 :: Chunk
+color256_b_156 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 156)))
 
-color256_b_163 :: Background256
-color256_b_163 = Background256 (Just (T.ColorNumber 163))
+color256_b_157 :: Chunk
+color256_b_157 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 157)))
 
-color256_b_164 :: Background256
-color256_b_164 = Background256 (Just (T.ColorNumber 164))
+color256_b_158 :: Chunk
+color256_b_158 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 158)))
 
-color256_b_165 :: Background256
-color256_b_165 = Background256 (Just (T.ColorNumber 165))
+color256_b_159 :: Chunk
+color256_b_159 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 159)))
 
-color256_b_166 :: Background256
-color256_b_166 = Background256 (Just (T.ColorNumber 166))
+color256_b_160 :: Chunk
+color256_b_160 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 160)))
 
-color256_b_167 :: Background256
-color256_b_167 = Background256 (Just (T.ColorNumber 167))
+color256_b_161 :: Chunk
+color256_b_161 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 161)))
 
-color256_b_168 :: Background256
-color256_b_168 = Background256 (Just (T.ColorNumber 168))
+color256_b_162 :: Chunk
+color256_b_162 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 162)))
 
-color256_b_169 :: Background256
-color256_b_169 = Background256 (Just (T.ColorNumber 169))
+color256_b_163 :: Chunk
+color256_b_163 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 163)))
 
-color256_b_170 :: Background256
-color256_b_170 = Background256 (Just (T.ColorNumber 170))
+color256_b_164 :: Chunk
+color256_b_164 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 164)))
 
-color256_b_171 :: Background256
-color256_b_171 = Background256 (Just (T.ColorNumber 171))
+color256_b_165 :: Chunk
+color256_b_165 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 165)))
 
-color256_b_172 :: Background256
-color256_b_172 = Background256 (Just (T.ColorNumber 172))
+color256_b_166 :: Chunk
+color256_b_166 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 166)))
 
-color256_b_173 :: Background256
-color256_b_173 = Background256 (Just (T.ColorNumber 173))
+color256_b_167 :: Chunk
+color256_b_167 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 167)))
 
-color256_b_174 :: Background256
-color256_b_174 = Background256 (Just (T.ColorNumber 174))
+color256_b_168 :: Chunk
+color256_b_168 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 168)))
 
-color256_b_175 :: Background256
-color256_b_175 = Background256 (Just (T.ColorNumber 175))
+color256_b_169 :: Chunk
+color256_b_169 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 169)))
 
-color256_b_176 :: Background256
-color256_b_176 = Background256 (Just (T.ColorNumber 176))
+color256_b_170 :: Chunk
+color256_b_170 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 170)))
 
-color256_b_177 :: Background256
-color256_b_177 = Background256 (Just (T.ColorNumber 177))
+color256_b_171 :: Chunk
+color256_b_171 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 171)))
 
-color256_b_178 :: Background256
-color256_b_178 = Background256 (Just (T.ColorNumber 178))
+color256_b_172 :: Chunk
+color256_b_172 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 172)))
 
-color256_b_179 :: Background256
-color256_b_179 = Background256 (Just (T.ColorNumber 179))
+color256_b_173 :: Chunk
+color256_b_173 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 173)))
 
-color256_b_180 :: Background256
-color256_b_180 = Background256 (Just (T.ColorNumber 180))
+color256_b_174 :: Chunk
+color256_b_174 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 174)))
 
-color256_b_181 :: Background256
-color256_b_181 = Background256 (Just (T.ColorNumber 181))
+color256_b_175 :: Chunk
+color256_b_175 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 175)))
 
-color256_b_182 :: Background256
-color256_b_182 = Background256 (Just (T.ColorNumber 182))
+color256_b_176 :: Chunk
+color256_b_176 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 176)))
 
-color256_b_183 :: Background256
-color256_b_183 = Background256 (Just (T.ColorNumber 183))
+color256_b_177 :: Chunk
+color256_b_177 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 177)))
 
-color256_b_184 :: Background256
-color256_b_184 = Background256 (Just (T.ColorNumber 184))
+color256_b_178 :: Chunk
+color256_b_178 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 178)))
 
-color256_b_185 :: Background256
-color256_b_185 = Background256 (Just (T.ColorNumber 185))
+color256_b_179 :: Chunk
+color256_b_179 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 179)))
 
-color256_b_186 :: Background256
-color256_b_186 = Background256 (Just (T.ColorNumber 186))
+color256_b_180 :: Chunk
+color256_b_180 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 180)))
 
-color256_b_187 :: Background256
-color256_b_187 = Background256 (Just (T.ColorNumber 187))
+color256_b_181 :: Chunk
+color256_b_181 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 181)))
 
-color256_b_188 :: Background256
-color256_b_188 = Background256 (Just (T.ColorNumber 188))
+color256_b_182 :: Chunk
+color256_b_182 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 182)))
 
-color256_b_189 :: Background256
-color256_b_189 = Background256 (Just (T.ColorNumber 189))
+color256_b_183 :: Chunk
+color256_b_183 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 183)))
 
-color256_b_190 :: Background256
-color256_b_190 = Background256 (Just (T.ColorNumber 190))
+color256_b_184 :: Chunk
+color256_b_184 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 184)))
 
-color256_b_191 :: Background256
-color256_b_191 = Background256 (Just (T.ColorNumber 191))
+color256_b_185 :: Chunk
+color256_b_185 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 185)))
 
-color256_b_192 :: Background256
-color256_b_192 = Background256 (Just (T.ColorNumber 192))
+color256_b_186 :: Chunk
+color256_b_186 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 186)))
 
-color256_b_193 :: Background256
-color256_b_193 = Background256 (Just (T.ColorNumber 193))
+color256_b_187 :: Chunk
+color256_b_187 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 187)))
 
-color256_b_194 :: Background256
-color256_b_194 = Background256 (Just (T.ColorNumber 194))
+color256_b_188 :: Chunk
+color256_b_188 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 188)))
 
-color256_b_195 :: Background256
-color256_b_195 = Background256 (Just (T.ColorNumber 195))
+color256_b_189 :: Chunk
+color256_b_189 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 189)))
 
-color256_b_196 :: Background256
-color256_b_196 = Background256 (Just (T.ColorNumber 196))
+color256_b_190 :: Chunk
+color256_b_190 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 190)))
 
-color256_b_197 :: Background256
-color256_b_197 = Background256 (Just (T.ColorNumber 197))
+color256_b_191 :: Chunk
+color256_b_191 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 191)))
 
-color256_b_198 :: Background256
-color256_b_198 = Background256 (Just (T.ColorNumber 198))
+color256_b_192 :: Chunk
+color256_b_192 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 192)))
 
-color256_b_199 :: Background256
-color256_b_199 = Background256 (Just (T.ColorNumber 199))
+color256_b_193 :: Chunk
+color256_b_193 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 193)))
 
-color256_b_200 :: Background256
-color256_b_200 = Background256 (Just (T.ColorNumber 200))
+color256_b_194 :: Chunk
+color256_b_194 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 194)))
 
-color256_b_201 :: Background256
-color256_b_201 = Background256 (Just (T.ColorNumber 201))
+color256_b_195 :: Chunk
+color256_b_195 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 195)))
 
-color256_b_202 :: Background256
-color256_b_202 = Background256 (Just (T.ColorNumber 202))
+color256_b_196 :: Chunk
+color256_b_196 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 196)))
 
-color256_b_203 :: Background256
-color256_b_203 = Background256 (Just (T.ColorNumber 203))
+color256_b_197 :: Chunk
+color256_b_197 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 197)))
 
-color256_b_204 :: Background256
-color256_b_204 = Background256 (Just (T.ColorNumber 204))
+color256_b_198 :: Chunk
+color256_b_198 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 198)))
 
-color256_b_205 :: Background256
-color256_b_205 = Background256 (Just (T.ColorNumber 205))
+color256_b_199 :: Chunk
+color256_b_199 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 199)))
 
-color256_b_206 :: Background256
-color256_b_206 = Background256 (Just (T.ColorNumber 206))
+color256_b_200 :: Chunk
+color256_b_200 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 200)))
 
-color256_b_207 :: Background256
-color256_b_207 = Background256 (Just (T.ColorNumber 207))
+color256_b_201 :: Chunk
+color256_b_201 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 201)))
 
-color256_b_208 :: Background256
-color256_b_208 = Background256 (Just (T.ColorNumber 208))
+color256_b_202 :: Chunk
+color256_b_202 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 202)))
 
-color256_b_209 :: Background256
-color256_b_209 = Background256 (Just (T.ColorNumber 209))
+color256_b_203 :: Chunk
+color256_b_203 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 203)))
 
-color256_b_210 :: Background256
-color256_b_210 = Background256 (Just (T.ColorNumber 210))
+color256_b_204 :: Chunk
+color256_b_204 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 204)))
 
-color256_b_211 :: Background256
-color256_b_211 = Background256 (Just (T.ColorNumber 211))
+color256_b_205 :: Chunk
+color256_b_205 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 205)))
 
-color256_b_212 :: Background256
-color256_b_212 = Background256 (Just (T.ColorNumber 212))
+color256_b_206 :: Chunk
+color256_b_206 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 206)))
 
-color256_b_213 :: Background256
-color256_b_213 = Background256 (Just (T.ColorNumber 213))
+color256_b_207 :: Chunk
+color256_b_207 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 207)))
 
-color256_b_214 :: Background256
-color256_b_214 = Background256 (Just (T.ColorNumber 214))
+color256_b_208 :: Chunk
+color256_b_208 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 208)))
 
-color256_b_215 :: Background256
-color256_b_215 = Background256 (Just (T.ColorNumber 215))
+color256_b_209 :: Chunk
+color256_b_209 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 209)))
 
-color256_b_216 :: Background256
-color256_b_216 = Background256 (Just (T.ColorNumber 216))
+color256_b_210 :: Chunk
+color256_b_210 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 210)))
 
-color256_b_217 :: Background256
-color256_b_217 = Background256 (Just (T.ColorNumber 217))
+color256_b_211 :: Chunk
+color256_b_211 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 211)))
 
-color256_b_218 :: Background256
-color256_b_218 = Background256 (Just (T.ColorNumber 218))
+color256_b_212 :: Chunk
+color256_b_212 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 212)))
 
-color256_b_219 :: Background256
-color256_b_219 = Background256 (Just (T.ColorNumber 219))
+color256_b_213 :: Chunk
+color256_b_213 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 213)))
 
-color256_b_220 :: Background256
-color256_b_220 = Background256 (Just (T.ColorNumber 220))
+color256_b_214 :: Chunk
+color256_b_214 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 214)))
 
-color256_b_221 :: Background256
-color256_b_221 = Background256 (Just (T.ColorNumber 221))
+color256_b_215 :: Chunk
+color256_b_215 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 215)))
 
-color256_b_222 :: Background256
-color256_b_222 = Background256 (Just (T.ColorNumber 222))
+color256_b_216 :: Chunk
+color256_b_216 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 216)))
 
-color256_b_223 :: Background256
-color256_b_223 = Background256 (Just (T.ColorNumber 223))
+color256_b_217 :: Chunk
+color256_b_217 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 217)))
 
-color256_b_224 :: Background256
-color256_b_224 = Background256 (Just (T.ColorNumber 224))
+color256_b_218 :: Chunk
+color256_b_218 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 218)))
 
-color256_b_225 :: Background256
-color256_b_225 = Background256 (Just (T.ColorNumber 225))
+color256_b_219 :: Chunk
+color256_b_219 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 219)))
 
-color256_b_226 :: Background256
-color256_b_226 = Background256 (Just (T.ColorNumber 226))
+color256_b_220 :: Chunk
+color256_b_220 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 220)))
 
-color256_b_227 :: Background256
-color256_b_227 = Background256 (Just (T.ColorNumber 227))
+color256_b_221 :: Chunk
+color256_b_221 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 221)))
 
-color256_b_228 :: Background256
-color256_b_228 = Background256 (Just (T.ColorNumber 228))
+color256_b_222 :: Chunk
+color256_b_222 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 222)))
 
-color256_b_229 :: Background256
-color256_b_229 = Background256 (Just (T.ColorNumber 229))
+color256_b_223 :: Chunk
+color256_b_223 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 223)))
 
-color256_b_230 :: Background256
-color256_b_230 = Background256 (Just (T.ColorNumber 230))
+color256_b_224 :: Chunk
+color256_b_224 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 224)))
 
-color256_b_231 :: Background256
-color256_b_231 = Background256 (Just (T.ColorNumber 231))
+color256_b_225 :: Chunk
+color256_b_225 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 225)))
 
-color256_b_232 :: Background256
-color256_b_232 = Background256 (Just (T.ColorNumber 232))
+color256_b_226 :: Chunk
+color256_b_226 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 226)))
 
-color256_b_233 :: Background256
-color256_b_233 = Background256 (Just (T.ColorNumber 233))
+color256_b_227 :: Chunk
+color256_b_227 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 227)))
 
-color256_b_234 :: Background256
-color256_b_234 = Background256 (Just (T.ColorNumber 234))
+color256_b_228 :: Chunk
+color256_b_228 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 228)))
 
-color256_b_235 :: Background256
-color256_b_235 = Background256 (Just (T.ColorNumber 235))
+color256_b_229 :: Chunk
+color256_b_229 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 229)))
 
-color256_b_236 :: Background256
-color256_b_236 = Background256 (Just (T.ColorNumber 236))
+color256_b_230 :: Chunk
+color256_b_230 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 230)))
 
-color256_b_237 :: Background256
-color256_b_237 = Background256 (Just (T.ColorNumber 237))
+color256_b_231 :: Chunk
+color256_b_231 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 231)))
 
-color256_b_238 :: Background256
-color256_b_238 = Background256 (Just (T.ColorNumber 238))
+color256_b_232 :: Chunk
+color256_b_232 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 232)))
 
-color256_b_239 :: Background256
-color256_b_239 = Background256 (Just (T.ColorNumber 239))
+color256_b_233 :: Chunk
+color256_b_233 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 233)))
 
-color256_b_240 :: Background256
-color256_b_240 = Background256 (Just (T.ColorNumber 240))
+color256_b_234 :: Chunk
+color256_b_234 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 234)))
 
-color256_b_241 :: Background256
-color256_b_241 = Background256 (Just (T.ColorNumber 241))
+color256_b_235 :: Chunk
+color256_b_235 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 235)))
 
-color256_b_242 :: Background256
-color256_b_242 = Background256 (Just (T.ColorNumber 242))
+color256_b_236 :: Chunk
+color256_b_236 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 236)))
 
-color256_b_243 :: Background256
-color256_b_243 = Background256 (Just (T.ColorNumber 243))
+color256_b_237 :: Chunk
+color256_b_237 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 237)))
 
-color256_b_244 :: Background256
-color256_b_244 = Background256 (Just (T.ColorNumber 244))
+color256_b_238 :: Chunk
+color256_b_238 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 238)))
 
-color256_b_245 :: Background256
-color256_b_245 = Background256 (Just (T.ColorNumber 245))
+color256_b_239 :: Chunk
+color256_b_239 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 239)))
 
-color256_b_246 :: Background256
-color256_b_246 = Background256 (Just (T.ColorNumber 246))
+color256_b_240 :: Chunk
+color256_b_240 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 240)))
 
-color256_b_247 :: Background256
-color256_b_247 = Background256 (Just (T.ColorNumber 247))
+color256_b_241 :: Chunk
+color256_b_241 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 241)))
 
-color256_b_248 :: Background256
-color256_b_248 = Background256 (Just (T.ColorNumber 248))
+color256_b_242 :: Chunk
+color256_b_242 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 242)))
 
-color256_b_249 :: Background256
-color256_b_249 = Background256 (Just (T.ColorNumber 249))
+color256_b_243 :: Chunk
+color256_b_243 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 243)))
 
-color256_b_250 :: Background256
-color256_b_250 = Background256 (Just (T.ColorNumber 250))
+color256_b_244 :: Chunk
+color256_b_244 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 244)))
 
-color256_b_251 :: Background256
-color256_b_251 = Background256 (Just (T.ColorNumber 251))
+color256_b_245 :: Chunk
+color256_b_245 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 245)))
 
-color256_b_252 :: Background256
-color256_b_252 = Background256 (Just (T.ColorNumber 252))
+color256_b_246 :: Chunk
+color256_b_246 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 246)))
 
-color256_b_253 :: Background256
-color256_b_253 = Background256 (Just (T.ColorNumber 253))
+color256_b_247 :: Chunk
+color256_b_247 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 247)))
 
-color256_b_254 :: Background256
-color256_b_254 = Background256 (Just (T.ColorNumber 254))
+color256_b_248 :: Chunk
+color256_b_248 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 248)))
 
-color256_b_255 :: Background256
-color256_b_255 = Background256 (Just (T.ColorNumber 255))
+color256_b_249 :: Chunk
+color256_b_249 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 249)))
+
+color256_b_250 :: Chunk
+color256_b_250 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 250)))
+
+color256_b_251 :: Chunk
+color256_b_251 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 251)))
+
+color256_b_252 :: Chunk
+color256_b_252 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 252)))
+
+color256_b_253 :: Chunk
+color256_b_253 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 253)))
+
+color256_b_254 :: Chunk
+color256_b_254 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 254)))
+
+color256_b_255 :: Chunk
+color256_b_255 = mempty & textSpec . style256 . background256
+  . unwrapped . unwrapped .~ (Just (Just (T.ColorNumber 255)))
 
