@@ -41,7 +41,7 @@
 -- If 'mappend' multiple chunks that change the same property, the
 -- rightmost one \"wins\":
 --
--- > putChunkLn $ "You will not see this text" <> "This text is printed"
+-- > putChunkLn $ "This will be blue" <> f_red <> f_blue
 --
 -- This property comes in handy if you want to specify a default color
 -- for 8- and 256-color terminals, then a more specific shade for a
@@ -49,13 +49,17 @@
 --
 -- > putChunkLn $ "Pink" <> f_red <> c256_f_201
 --
--- As the above examples show, after a chunk is made, there is no
--- (easy) way to add text to that same chunk, as 'mappend'ing some
--- text will replace the text in the old chunk. Also, although one
--- chunk can have different colors on 8- and 256-color terminals, it
--- cannot have different colors on the same terminal. That is, if you
--- want to print some text in one color and some text in another
--- color, make two chunks.
+-- However, if you use 'mappend' to add additional 'Chunk's that have
+-- text, the text will be appended:
+--
+-- > putChunkLn $ f_green <> "You will see this text "
+-- >              <> "and this text too, but it will all be blue"
+-- >              <> f_blue
+--
+-- Although one chunk can have different colors on 8- and 256-color
+-- terminals, it cannot have different colors on the same
+-- terminal. That is, if you want to print some text in one color and
+-- some text in another color, make two chunks.
 
 module System.Console.Rainbow (
 
@@ -65,7 +69,7 @@ module System.Console.Rainbow (
   , smartTermFromEnv
 
   -- * Chunks
-  , Chunk
+  , Chunk(..)
 
   -- * Printing chunks
   , putChunks
@@ -98,7 +102,7 @@ module System.Console.Rainbow (
   -- There are also 'Chunk's to turn an effect off, such as
   -- 'boldOff'. Ordinarily you will not need these because each chunk
   -- starts with no effects, so you only need to turn on the effects
-  -- you want. However the @off@ modifiers are here if you need them.
+  -- you want. However the @off@ 'Chunk's are here if you need them.
 
   , bold, boldOff
   , underline, underlineOff
@@ -120,9 +124,9 @@ module System.Console.Rainbow (
 
   -- | These 'Chunk's affect 256-color terminals only.
   --
-  -- > str = "Underlined on 256 color terminal, "
-  -- >        ++ ""bold on 8-color terminals"
-  -- > putChunkLn $ fromString str <> underlined256 <> bold8
+  -- > putChunkLn $ "Underlined on 256-color terminal, "
+  -- >              <> "bold on 8-color terminal"
+  -- >              <> underlined256 <> bold8
 
   , bold256, bold256off
   , underline256, underline256off
@@ -862,7 +866,8 @@ smartTermFromEnv alwaysColor h =
           else return Dumb
 
 -- For Background8, Background256, Foreground8, Foreground256: the
--- newtype wraps a Terminfo Color. If Nothing, use the default color.
+-- Last wraps a Maybe (Terminfo Color). If the inner Maybe is Nothing,
+-- use the default color.
 
 type Background8 = Last (Maybe T.Color)
 type Background256 = Last (Maybe T.Color)
@@ -952,13 +957,13 @@ instance Monoid TextSpec where
 
 data Chunk = Chunk
   { _textSpec :: TextSpec
-  , _text :: Last Text
+  , _text :: Text
   } deriving (Eq, Show, Ord)
 
 makeLenses ''Chunk
 
 instance Str.IsString Chunk where
-  fromString s = Chunk mempty (Last (Just (X.pack s)))
+  fromString s = Chunk mempty (X.pack s)
 
 instance Monoid Chunk where
   mempty = Chunk mempty mempty
@@ -1029,7 +1034,7 @@ hPrintChunk h t (Chunk ts x) =
   $ [defaultColors t, codes, txt]
   where
     codes = getTermCodes t ts
-    txt = T.termText . maybe "" X.unpack . getLast $ x
+    txt = T.termText . X.unpack $ x
 
 -- | Sends a list of chunks to the given handle for printing. Sets up
 -- the terminal (this only needs to be done once.) Lazily processes
