@@ -749,13 +749,6 @@ module System.Console.Rainbow (
   -- definitions above will give you an instance of Mod that will
   -- create the effect or color you need.
 
-  -- ** Wrappers for effects
-
-  , Bold (..)
-  , Underline (..)
-  , Flash (..)
-  , Inverse (..)
-
   -- ** Wrappers for colors
 
   -- | Definitions are provided above that give you every possible
@@ -902,29 +895,6 @@ instance Monoid Foreground256 where
 
 
 --
--- Effects
---
-newtype Bold = Bold { _unBold :: Bool }
-  deriving (Show, Eq, Ord)
-
-makeWrapped ''Bold
-
-newtype Underline = Underline { _unUnderline :: Bool }
-  deriving (Show, Eq, Ord)
-
-makeWrapped ''Underline
-
-newtype Flash = Flash { _unFlash :: Bool }
-  deriving (Show, Eq, Ord)
-
-makeWrapped ''Flash
-
-newtype Inverse = Inverse { _unInverse :: Bool }
-  deriving (Show, Eq, Ord)
-
-makeWrapped ''Inverse
-
---
 -- Styles
 --
 
@@ -933,10 +903,10 @@ makeWrapped ''Inverse
 -- 256 color terminals, so that the text appearance can change
 -- depending on how many colors a terminal has.
 data StyleCommon = StyleCommon
-  { _scBold :: M.Last Bold
-  , _scUnderline :: M.Last Underline
-  , _scFlash :: M.Last Flash
-  , _scInverse :: M.Last Inverse
+  { _scBold :: M.Last Bool
+  , _scUnderline :: M.Last Bool
+  , _scFlash :: M.Last Bool
+  , _scInverse :: M.Last Bool
   } deriving (Show, Eq, Ord)
 
 makeLenses ''StyleCommon
@@ -1038,14 +1008,14 @@ commonAttrs :: T.Terminal -> StyleCommon -> T.TermOutput
 commonAttrs t s =
   let a = T.Attributes
         { T.standoutAttr = False
-        , T.underlineAttr = maybe False _unUnderline
+        , T.underlineAttr = fromMaybe False
           $ s ^. scUnderline . unwrapped
-        , T.reverseAttr = maybe False _unInverse
+        , T.reverseAttr = fromMaybe False
           $ s ^. scInverse . unwrapped
-        , T.blinkAttr = maybe False _unFlash
+        , T.blinkAttr = fromMaybe False
           $ s ^. scFlash . unwrapped
         , T.dimAttr = False
-        , T.boldAttr = maybe False _unBold
+        , T.boldAttr = fromMaybe False
           $ s ^. scBold . unwrapped
         , T.invisibleAttr = False
         , T.protectedAttr = False
@@ -1146,67 +1116,67 @@ putChunkLn c = putChunk c >> putStr "\n"
 
 bold8 :: Chunk
 bold8 = mempty & textSpec . style8 . common8
-                 . scBold . unwrapped .~ Just (Bold True)
+                 . scBold . unwrapped .~ Just True
 
 bold8off :: Chunk
 bold8off = mempty & textSpec . style8 . common8
-                    . scBold . unwrapped .~ Just (Bold False)
+                    . scBold . unwrapped .~ Just False
 
 underline8 :: Chunk
 underline8 = mempty & textSpec . style8 . common8
-                 . scUnderline . unwrapped .~ Just (Underline True)
+                 . scUnderline . unwrapped .~ Just True
 
 underline8off :: Chunk
 underline8off = mempty & textSpec . style8 . common8
-                    . scUnderline . unwrapped .~ Just (Underline False)
+                    . scUnderline . unwrapped .~ Just False
 
 flash8 :: Chunk
 flash8 = mempty & textSpec . style8 . common8
-                 . scFlash . unwrapped .~ Just (Flash True)
+                 . scFlash . unwrapped .~ Just True
 
 flash8off :: Chunk
 flash8off = mempty & textSpec . style8 . common8
-                    . scFlash . unwrapped .~ Just (Flash False)
+                    . scFlash . unwrapped .~ Just False
 
 inverse8 :: Chunk
 inverse8 = mempty & textSpec . style8 . common8
-                 . scInverse . unwrapped .~ Just (Inverse True)
+                 . scInverse . unwrapped .~ Just True
 
 inverse8off :: Chunk
 inverse8off = mempty & textSpec . style8 . common8
-                    . scInverse . unwrapped .~ Just (Inverse False)
+                    . scInverse . unwrapped .~ Just False
 
 underline256 :: Chunk
 underline256 = mempty & textSpec . style256 . common256
-                 . scUnderline . unwrapped .~ Just (Underline True)
+                 . scUnderline . unwrapped .~ Just True
 
 underline256off :: Chunk
 underline256off = mempty & textSpec . style256 . common256
-                    . scUnderline . unwrapped .~ Just (Underline False)
+                    . scUnderline . unwrapped .~ Just False
 
 bold256 :: Chunk
 bold256 = mempty & textSpec . style256 . common256
-                 . scBold . unwrapped .~ Just (Bold True)
+                 . scBold . unwrapped .~ Just True
 
 bold256off :: Chunk
 bold256off = mempty & textSpec . style256 . common256
-                    . scBold . unwrapped .~ Just (Bold False)
+                    . scBold . unwrapped .~ Just False
 
 inverse256 :: Chunk
 inverse256 = mempty & textSpec . style256 . common256
-                 . scInverse . unwrapped .~ Just (Inverse True)
+                 . scInverse . unwrapped .~ Just True
 
 inverse256off :: Chunk
 inverse256off = mempty & textSpec . style256 . common256
-                    . scInverse . unwrapped .~ Just (Inverse False)
+                    . scInverse . unwrapped .~ Just False
 
 flash256 :: Chunk
 flash256 = mempty & textSpec . style256 . common256
-                 . scFlash . unwrapped .~ Just (Flash True)
+                 . scFlash . unwrapped .~ Just True
 
 flash256off :: Chunk
 flash256off = mempty & textSpec . style256 . common256
-                    . scFlash . unwrapped .~ Just (Flash False)
+                    . scFlash . unwrapped .~ Just False
 
 --
 -- All
