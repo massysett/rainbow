@@ -1,11 +1,20 @@
 name:                rainbow
-version:             0.3.0.0
+version:             0.4.0.0
 synopsis:            Print text to terminal with colors and effects
 description:
   rainbow helps you print Text chunks to a terminal with colors and effects
   such as bold, underlining, etc. You pair each Text with a description
   of how it should appear. Rainbow works with both 8-color and 256-color
   terminals.
+
+  .
+
+  rainbow uses the terminfo package which, in turn, needs the full C
+  library for ncurses installed, including the development
+  headers. Before installing terminfo, you may need to install the
+  ncurses headers (for instance, on Debian systems, install the
+  libncurses5-dev package.)
+
 homepage:            http://github.com/massysett/rainbow
 license:             BSD3
 license-file:        LICENSE
