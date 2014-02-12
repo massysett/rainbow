@@ -1,5 +1,5 @@
 name:                rainbow
-version:             0.5.0.0
+version:             0.6.0.0
 synopsis:            Print text to terminal with colors and effects
 description:
   rainbow helps you print Text chunks to a terminal with colors and effects
