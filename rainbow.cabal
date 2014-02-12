@@ -42,8 +42,9 @@ library
   -- The dependencies shown here are looser to prevent needless build failures
   -- when the versions of dependencies go up.  If rainbow does not build due to
   -- dependency problems, please file a bug on Github.
+  -- hackage requires an upper bound on base.
   build-depends:
-      base >=4.6
+      base >=4.6 && <5
     , terminfo >=0.3
     , text >=0.11
 
