@@ -1,5 +1,5 @@
 name:                rainbow
-version:             0.4.0.0
+version:             0.6.0.0
 synopsis:            Print text to terminal with colors and effects
 description:
   rainbow helps you print Text chunks to a terminal with colors and effects
@@ -20,7 +20,8 @@ license:             BSD3
 license-file:        LICENSE
 author:              Omari Norman
 maintainer:          omari@smileystation.com
-copyright:           2013 Omari Norman
+stability:           experimental
+copyright:           2013-2014 Omari Norman
 category:            System
 build-type:          Simple
 cabal-version:       >=1.8
@@ -33,10 +34,17 @@ library
   exposed-modules:
       System.Console.Rainbow
 
+  -- Rainbow is known to work with the following dependencies:
+  -- base-4.6.0.1
+  -- terminfo 0.3.2.5 && 0.4.0.0
+  -- text-0.11.3.1
+  --
+  -- The dependencies shown here are looser to prevent needless build failures
+  -- when the versions of dependencies go up.  If rainbow does not build due to
+  -- dependency problems, please file a bug on Github.
   build-depends:
-      base ==4.6.*
-    , lens ==3.9.*
-    , terminfo ==0.3.*
-    , text ==0.11.*
+      base >=4.6
+    , terminfo >=0.3
+    , text >=0.11
 
   ghc-options: -Wall
