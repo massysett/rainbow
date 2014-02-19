@@ -25,6 +25,7 @@ copyright:           2013-2014 Omari Norman
 category:            System
 build-type:          Simple
 cabal-version:       >=1.8
+extra-source-files:  README.md, dependencies.txt
 
 source-repository head
     type: git
@@ -34,18 +35,9 @@ library
   exposed-modules:
       System.Console.Rainbow
 
-  -- Rainbow is known to work with the following dependencies:
-  -- base-4.6.0.1
-  -- terminfo 0.3.2.5 && 0.4.0.0
-  -- text-0.11.3.1
-  --
-  -- The dependencies shown here are looser to prevent needless build failures
-  -- when the versions of dependencies go up.  If rainbow does not build due to
-  -- dependency problems, please file a bug on Github.
-  -- hackage requires an upper bound on base.
   build-depends:
-      base >=4.6 && <5
-    , terminfo >=0.3
-    , text >=0.11
+      base >=4.5.1.0 && <5
+    , terminfo >=0.3.2
+    , text >=0.11.2.0
 
   ghc-options: -Wall

@@ -821,7 +821,7 @@ data Term
 -- environment does not have a TERM veriable, use 'Dumb'.
 termFromEnv :: IO Term
 termFromEnv = do
-  t <- Env.lookupEnv "TERM"
+  t <- fmap (lookup "TERM") Env.getEnvironment
   return $ maybe Dumb TermName t
 
 -- | Gets the terminal definition from the environment. If the first
