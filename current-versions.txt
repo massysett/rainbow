@@ -1,5 +1,9 @@
-These dependencies are known to work with rainbow
-as of 2014-02-18.  See the README.md for more information.
+This package was tested to work with these dependency
+versions and compiler version.
+These are the default versions fetched by cabal install.
+Tested as of: 2014-02-24 04:09:33.509271 UTC
+Path to compiler: ghc-7.6.3
+Compiler description: 7.6.3
 
 /opt/ghc-7.6.3/lib/ghc-7.6.3/package.conf.d:
     Cabal-1.16.0
@@ -28,8 +32,8 @@ as of 2014-02-18.  See the README.md for more information.
     time-1.4.0.1
     unix-2.6.0.1
 
-/home/massysett/rainbow/.cabal-sandbox/x86_64-linux-ghc-7.6.3-packages.conf.d:
-    rainbow-0.6.0.2
+/home/massysett/rainbow/sunlight-16708/db:
+    rainbow-0.6.0.4
     terminfo-0.4.0.0
     text-1.1.0.0
 

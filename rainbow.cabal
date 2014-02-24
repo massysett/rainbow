@@ -1,5 +1,5 @@
 name:                rainbow
-version:             0.6.0.2
+version:             0.6.0.4
 synopsis:            Print text to terminal with colors and effects
 description:
   rainbow helps you print Text chunks to a terminal with colors and effects
@@ -25,7 +25,11 @@ copyright:           2013-2014 Omari Norman
 category:            System
 build-type:          Simple
 cabal-version:       >=1.8
-extra-source-files:  README.md, dependencies.txt
+extra-source-files:
+  README.md, sunlight-test.hs,
+  minimum-versions.txt, current-versions.txt
+
+tested-with: GHC ==7.4.1, GHC ==7.6.3
 
 source-repository head
     type: git
@@ -36,7 +40,7 @@ library
       System.Console.Rainbow
 
   build-depends:
-      base >=4.5.1.0 && <5
+      base >=4.5.0.0 && <5
     , terminfo >=0.3.2
     , text >=0.11.2.0
 
