@@ -1,5 +1,5 @@
 name:                rainbow
-version:             0.6.0.4
+version:             0.7.0.0
 synopsis:            Print text to terminal with colors and effects
 description:
   rainbow helps you print Text chunks to a terminal with colors and effects
@@ -38,6 +38,9 @@ source-repository head
 library
   exposed-modules:
       System.Console.Rainbow
+    , System.Console.Rainbow.Types
+    , System.Console.Rainbow.Colors
+    , System.Console.Rainbow.ColorChunks
 
   build-depends:
       base >=4.5.0.0 && <5
