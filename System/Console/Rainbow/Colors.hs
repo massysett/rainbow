@@ -7,70 +7,72 @@
 module System.Console.Rainbow.Colors where
 
 import qualified System.Console.Terminfo as T
+import System.Console.Rainbow.Types
+import Data.Monoid
 
 -- # 8 color foreground
 
-c8_f_default :: Maybe T.Color
-c8_f_default = Nothing
+c8_f_default :: Foreground8
+c8_f_default = Last (Just Nothing)
 
-c8_f_black :: Maybe T.Color
-c8_f_black = (Just T.Black)
+c8_f_black :: Foreground8
+c8_f_black = Last (Just (Just T.Black))
 
-c8_f_red :: Maybe T.Color
-c8_f_red = (Just T.Red)
+c8_f_red :: Foreground8
+c8_f_red = Last (Just (Just T.Red))
 
-c8_f_green :: Maybe T.Color
-c8_f_green = (Just T.Green)
+c8_f_green :: Foreground8
+c8_f_green = Last (Just (Just T.Green))
 
-c8_f_yellow :: Maybe T.Color
-c8_f_yellow = (Just T.Yellow)
+c8_f_yellow :: Foreground8
+c8_f_yellow = Last (Just (Just T.Yellow))
 
-c8_f_blue :: Maybe T.Color
-c8_f_blue = (Just T.Blue)
+c8_f_blue :: Foreground8
+c8_f_blue = Last (Just (Just T.Blue))
 
-c8_f_magenta :: Maybe T.Color
-c8_f_magenta = (Just T.Magenta)
+c8_f_magenta :: Foreground8
+c8_f_magenta = Last (Just (Just T.Magenta))
 
-c8_f_cyan :: Maybe T.Color
-c8_f_cyan = (Just T.Cyan)
+c8_f_cyan :: Foreground8
+c8_f_cyan = Last (Just (Just T.Cyan))
 
-c8_f_white :: Maybe T.Color
-c8_f_white = (Just T.White)
+c8_f_white :: Foreground8
+c8_f_white = Last (Just (Just T.White))
 
 
 -- # 8 color background
 
-c8_b_default :: Maybe T.Color
-c8_b_default = Nothing
+c8_b_default :: Background8
+c8_b_default = Last (Just Nothing)
 
-c8_b_black :: Maybe T.Color
-c8_b_black = (Just T.Black)
+c8_b_black :: Background8
+c8_b_black = Last (Just (Just T.Black))
 
-c8_b_red :: Maybe T.Color
-c8_b_red = (Just T.Red)
+c8_b_red :: Background8
+c8_b_red = Last (Just (Just T.Red))
 
-c8_b_green :: Maybe T.Color
-c8_b_green = (Just T.Green)
+c8_b_green :: Background8
+c8_b_green = Last (Just (Just T.Green))
 
-c8_b_yellow :: Maybe T.Color
-c8_b_yellow = (Just T.Yellow)
+c8_b_yellow :: Background8
+c8_b_yellow = Last (Just (Just T.Yellow))
 
-c8_b_blue :: Maybe T.Color
-c8_b_blue = (Just T.Blue)
+c8_b_blue :: Background8
+c8_b_blue = Last (Just (Just T.Blue))
 
-c8_b_magenta :: Maybe T.Color
-c8_b_magenta = (Just T.Magenta)
+c8_b_magenta :: Background8
+c8_b_magenta = Last (Just (Just T.Magenta))
 
-c8_b_cyan :: Maybe T.Color
-c8_b_cyan = (Just T.Cyan)
+c8_b_cyan :: Background8
+c8_b_cyan = Last (Just (Just T.Cyan))
 
-c8_b_white :: Maybe T.Color
-c8_b_white = (Just T.White)
+c8_b_white :: Background8
+c8_b_white = Last (Just (Just T.White))
 
 -- # 256 color foreground
 
-c256_f_default :: Maybe T.Color
-c256_f_default = Nothing
+c256_f_default :: Foreground256
+c256_f_default = Last (Just Nothing)
 
 
 c256_f_0 :: Maybe T.Color
