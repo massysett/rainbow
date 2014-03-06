@@ -25,6 +25,11 @@ newtype Color8 = Color8 { unColor8 :: Maybe T.Color }
 newtype Color256 = Color256 { unColor256 :: Maybe T.Color }
   deriving (Eq, Ord, Show)
 
+-- | Any color for an 8-color terminal can also be used in a
+-- 256-color terminal.
+to256 :: Color8 -> Color256
+to256 = Color256 . unColor8
+
 -- * 8 color
 
 c8_default :: Color8
