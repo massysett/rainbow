@@ -14,6 +14,7 @@ import qualified Data.Text as X
 import qualified System.Console.Terminfo as T
 import System.IO as IO
 import System.Environment as Env
+import System.Console.Rainbow.Colors
 
 --
 -- Terminal definitions
@@ -71,10 +72,10 @@ smartTermFromEnv alwaysColor h =
 -- Last wraps a Maybe (Terminfo Color). If the inner Maybe is Nothing,
 -- use the default color.
 
-type Background8 = Last (Maybe T.Color)
-type Background256 = Last (Maybe T.Color)
-type Foreground8 = Last (Maybe T.Color)
-type Foreground256 = Last (Maybe T.Color)
+type Background8 = Last Color8
+type Background256 = Last Color256
+type Foreground8 = Last Color8
+type Foreground256 = Last Color256
 
 --
 -- Styles
@@ -214,11 +215,11 @@ getTermCodes t ts = fromMaybe mempty $ do
   setFg <- T.getCapability t T.setForegroundColor
   setBg <- T.getCapability t T.setBackgroundColor
   (fg, bg, cm) <- case () of
-    _ | cols >= 256 -> Just $ ( getLast f256
-                              , getLast b256
+    _ | cols >= 256 -> Just $ ( fmap unColor256 $ getLast f256
+                              , fmap unColor256 $ getLast b256
                               , c256)
-      | cols >= 8 -> Just ( getLast f8
-                         , getLast b8
+      | cols >= 8 -> Just ( fmap unColor8 $ getLast f8
+                         , fmap unColor8 $ getLast b8
                          , c8)
       | otherwise -> Nothing
   let oFg = maybe mempty (maybe mempty setFg) fg

@@ -8,13 +8,24 @@ module System.Console.Rainbow.Colors where
 
 import qualified System.Console.Terminfo as T
 
+-- | Color for an 8-color terminal.  Nothing indicates to use the
+-- default color for the terminal.  The Color should have a number
+-- in the range from 0 to 7 (inclusive) but the module does nothing
+-- to enforce this.  Use the names prefixed with @c256_@ if
+-- you want to stay within the correc range of colors.
+
 newtype Color8 = Color8 { unColor8 :: Maybe T.Color }
   deriving (Eq, Ord, Show)
 
+-- | Color for an 256-color terminal.  Nothing indicates to use the
+-- default color for the terminal.  The Color should have a number
+-- in the range from 0 to 255 (inclusive) but the module does
+-- nothing to enforce this.  Use the names prefixed with @c256_@ if
+-- you want to stay within the correc range of colors.
 newtype Color256 = Color256 { unColor256 :: Maybe T.Color }
   deriving (Eq, Ord, Show)
 
--- # 8 color
+-- * 8 color
 
 c8_default :: Color8
 c8_default = Color8 Nothing
@@ -43,10 +54,10 @@ c8_cyan = Color8 (Just T.Cyan)
 c8_white :: Color8
 c8_white = Color8 (Just T.White)
 
--- # 256 color
+-- * 256 color
 
-c256_f_default :: Color256
-c256_f_default = Color256 Nothing
+c256_default :: Color256
+c256_default = Color256 Nothing
 
 c256_0 :: Color256
 c256_0 = Color256 (Just (T.ColorNumber 0))

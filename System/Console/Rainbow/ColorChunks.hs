@@ -17,6 +17,7 @@
 module System.Console.Rainbow.ColorChunks where
 
 import System.Console.Rainbow.Types
+import System.Console.Rainbow.Colors
 import qualified System.Console.Terminfo as T
 import Data.Monoid
 
@@ -1790,7 +1791,7 @@ c256_b_255 = bc256 (Just (T.ColorNumber 255))
 fc8 :: Maybe T.Color -> Chunk
 fc8 c = x { textSpec = (textSpec x) {
   style8 = (style8 (textSpec x)) {
-    foreground8 = Last (Just c) }}}
+    foreground8 = Last . Just . Color8 $ c }}}
   where
     x = mempty
 
@@ -1798,7 +1799,7 @@ fc8 c = x { textSpec = (textSpec x) {
 bc8 :: Maybe T.Color -> Chunk
 bc8 c = x { textSpec = (textSpec x) {
   style8 = (style8 (textSpec x)) {
-    background8 = Last (Just c) }}}
+    background8 = Last . Just . Color8 $ c }}}
   where
     x = mempty
 
@@ -1806,7 +1807,7 @@ bc8 c = x { textSpec = (textSpec x) {
 fc256 :: Maybe T.Color -> Chunk
 fc256 c = x { textSpec = (textSpec x) {
   style256 = (style256 (textSpec x)) {
-    foreground256 = Last (Just c) }}}
+    foreground256 = Last . Just . Color256 $ c }}}
   where
     x = mempty
 
@@ -1814,7 +1815,7 @@ fc256 c = x { textSpec = (textSpec x) {
 bc256 :: Maybe T.Color -> Chunk
 bc256 c = x { textSpec = (textSpec x) {
   style256 = (style256 (textSpec x)) {
-    background256 = Last (Just c) }}}
+    background256 = Last . Just . Color256 $ c }}}
   where
     x = mempty
 
