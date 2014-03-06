@@ -1,5 +1,5 @@
 name:                rainbow
-version:             0.10.0.1
+version:             pv_rainbow
 synopsis:            Print text to terminal with colors and effects
 description:
   rainbow helps you print Text chunks to a terminal with colors and effects
@@ -43,8 +43,8 @@ library
     , System.Console.Rainbow.ColorChunks
 
   build-depends:
-      base >=4.5.0.0 && <5
-    , terminfo >=0.3.2
-    , text >=0.11.2.0
+      base >= pv_base && < pv_base_max
+    , terminfo >= pv_terminfo
+    , text >= pv_text
 
   ghc-options: -Wall
