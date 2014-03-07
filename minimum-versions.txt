@@ -1,7 +1,7 @@
 This package was tested to work with these dependency
 versions and compiler version.
 These are the minimum versions given in the .cabal file.
-Tested as of: 2014-03-06 03:10:17.951948 UTC
+Tested as of: 2014-03-07 02:43:28.406579 UTC
 Path to compiler: ghc-7.4.1
 Compiler description: 7.4.1
 
@@ -33,8 +33,8 @@ Compiler description: 7.4.1
     time-1.4
     unix-2.5.1.0
 
-/home/massysett/rainbow/sunlight-18146/db:
-    rainbow-0.10.0.0
+/home/massysett/rainbow/sunlight-32032/db:
+    rainbow-0.10.2.0
     terminfo-0.3.2
     text-0.11.2.0
 
