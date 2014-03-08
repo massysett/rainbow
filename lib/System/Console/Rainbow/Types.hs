@@ -44,29 +44,22 @@ termFromEnv = do
   t <- fmap (lookup "TERM") Env.getEnvironment
   return $ maybe Dumb TermName t
 
--- | Gets the terminal definition from the environment. If the first
--- argument is True, the terminal is always obtained from the
--- environment. If it is False, the terminal is only obtained from the
--- environment if the given handle is not a terminal; otherwise, Dumb
--- is returned.
+-- | Gets the terminal definition from the environment and a handle.
+-- If the handle is not a terminal, 'Dumb' is returned.  Otherwise,
+-- the terminal is obtained from the environment.
+--
+-- /Changed in version 0.12.0.0/ - the type of this function was
+-- different in previous versions.
 smartTermFromEnv
-  :: Bool
-  -- ^ Use True if the user always wants to see colors, even if
-  -- standard output is not a terminal. Otherwise, use False.
-
-  -> IO.Handle
+  :: IO.Handle
   -- ^ Check this handle to see if it is a terminal (typically you
   -- will use stdout).
 
   -> IO Term
-smartTermFromEnv alwaysColor h =
-  if alwaysColor
-  then termFromEnv
-  else do
-        isTerm <- IO.hIsTerminalDevice h
-        if isTerm
-          then termFromEnv
-          else return Dumb
+smartTermFromEnv h = IO.hIsTerminalDevice h >>= f
+  where
+    f isTerm | isTerm = termFromEnv
+             | otherwise = return Dumb
 
 -- For Background8, Background256, Foreground8, Foreground256: the
 -- Last wraps a Maybe (Terminfo Color). If the inner Maybe is Nothing,
@@ -163,6 +156,7 @@ data Chunk = Chunk
 instance Str.IsString Chunk where
   fromString s = Chunk mempty (X.pack s)
 
+-- | Creates a 'Chunk' with default colors and no special effects.
 fromText :: Text -> Chunk
 fromText = Chunk mempty
 

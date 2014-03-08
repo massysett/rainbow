@@ -48,3 +48,4 @@ library
     , text >= pv_text
 
   ghc-options: -Wall
+  hs-source-dirs: lib
