@@ -41,6 +41,9 @@ library
     , System.Console.Rainbow.Types
     , System.Console.Rainbow.Colors
     , System.Console.Rainbow.ColorChunks
+    , System.Console.Rainbow.Lazy
+    , System.Console.Rainbow.Lazy.Types
+    , System.Console.Rainbow.Lazy.ColorChunks
 
   build-depends:
       base >= pv_base && < pv_base_max
