@@ -3,8 +3,15 @@ version: pv_rainbow
 synopsis: Test helpers for rainbow
 description:
   Contains generators for rainbow types.
+  .
+  Some other packages use these generators.  They are in this
+  separate package to keep rainbow from having a dependency
+  on QuickCheck.
 
+maintainer: omari@smileystation.com
+category: System
 license: BSD3
+license-file: LICENSE
 build-type: Simple
 cabal-version: >= 1.8
 
