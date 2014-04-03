@@ -29,7 +29,7 @@ extra-source-files:
   README.md, sunlight-test.hs,
   minimum-versions.txt, current-versions.txt
 
-tested-with: GHC ==7.4.1, GHC ==7.6.3
+tested-with: GHC ==7.4.1, GHC ==7.6.3, GHC ==7.8.2
 
 source-repository head
     type: git

@@ -1,0 +1,4 @@
+0.14.0.0
+
+  * Change Chunk to hold a list of strict Text rather
+  than just a single Text.

@@ -71,6 +71,7 @@ module System.Console.Rainbow
   -- * Chunks
   , Chunk(..)
   , fromText
+  , fromLazyText
 
   -- * Printing chunks
   , putChunks

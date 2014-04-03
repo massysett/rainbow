@@ -11,6 +11,7 @@ import Data.Monoid
 import Data.Text (Text)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as X
+import qualified Data.Text.Lazy as XL
 import qualified System.Console.Terminfo as T
 import System.IO as IO
 import System.Environment as Env
@@ -146,19 +147,27 @@ instance Monoid TextSpec where
 -- underlined, etc. The chunk knows what foreground and background
 -- colors and what attributes to use for both an 8 color terminal and
 -- a 256 color terminal.
+--
+-- The text is held as a list of strict 'Text'.
 
 data Chunk = Chunk
   { textSpec :: TextSpec
-  , text :: Text
+  , text :: [Text]
   } deriving (Eq, Show, Ord)
 
 
 instance Str.IsString Chunk where
-  fromString s = Chunk mempty (X.pack s)
+  fromString s = Chunk mempty [(X.pack s)]
 
--- | Creates a 'Chunk' with default colors and no special effects.
+-- | Creates a 'Chunk' from a strict 'X.Text' with default colors
+-- and no special effects.
 fromText :: Text -> Chunk
-fromText = Chunk mempty
+fromText = Chunk mempty . (:[])
+
+-- | Creates a 'Chunk' from a lazy 'XL.Text' with default colors and
+-- no special effects.
+fromLazyText :: XL.Text -> Chunk
+fromLazyText = Chunk mempty . XL.toChunks
 
 instance Monoid Chunk where
   mempty = Chunk mempty mempty
@@ -223,13 +232,12 @@ getTermCodes t ts = fromMaybe mempty $ do
 
 
 hPrintChunk :: IO.Handle -> T.Terminal -> Chunk -> IO ()
-hPrintChunk h t (Chunk ts x) =
+hPrintChunk h t (Chunk ts xs) =
   T.hRunTermOutput h t
   . mconcat
-  $ [defaultColors t, codes, txt]
+  $ defaultColors t : codes : (map (T.termText . X.unpack) $ xs)
   where
     codes = getTermCodes t ts
-    txt = T.termText . X.unpack $ x
 
 -- | Sends a list of chunks to the given handle for printing. Sets up
 -- the terminal (this only needs to be done once.) Lazily processes

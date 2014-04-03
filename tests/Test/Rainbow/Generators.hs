@@ -71,12 +71,12 @@ style256 = liftM3 Style256
 textSpec :: Gen TextSpec
 textSpec = liftM2 TextSpec style8 style256
 
-chunk :: X.Text -> Gen Chunk
+chunk :: [X.Text] -> Gen Chunk
 chunk x = liftM2 Chunk textSpec (return x)
 
--- | Generates one Chunk for each Text in the list and combines them
--- into one Chunk.
-combinedChunks :: [X.Text] -> Gen Chunk
+-- | Generates one Chunk for each list of Text in the list and
+-- combines them into one Chunk.
+combinedChunks :: [[X.Text]] -> Gen Chunk
 combinedChunks ls = do
   cs <- mapM chunk ls
   return $ foldl (<>) mempty cs
