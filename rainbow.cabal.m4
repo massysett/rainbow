@@ -27,7 +27,8 @@ build-type:          Simple
 cabal-version:       >=1.8
 extra-source-files:
   README.md, sunlight-test.hs,
-  minimum-versions.txt, current-versions.txt
+  minimum-versions.txt, current-versions.txt,
+  changelog
 
 tested-with: GHC ==7.4.1, GHC ==7.6.3, GHC ==7.8.2
 
