@@ -2,9 +2,11 @@
 --
 -- Written for Cartel version 0.10.0.2.
 
+import qualified Cartel as A
+
 -- Package version
 version :: A.Version
-version = A.Version [0,16,0,0]
+version = A.Version [0,14,0,2]
 
 -- Dependencies
 
@@ -16,9 +18,6 @@ terminfo = A.closedOpen "terminfo" [0,3,2] [0,5,0,0]
 
 text :: A.Package
 text = A.closedOpen "text" [0,11,2,0] [1,2,0,0]
-
-quickcheck :: A.Package
-quickcheck = A.closedOpen "QuickCheck" [2,6] [2,8]
 
 properties :: A.Properties
 properties = A.empty
@@ -74,5 +73,26 @@ library
 library ms = A.Library
   [ A.LibExposedModules ms
   , A.defaultLanguage A.Haskell2010
-  , A.
+  , A.ghcOptions ["-Wall"]
+  , A.hsSourceDirs ["lib"]
+  , A.buildDepends
+    [ base
+    , terminfo
+    , text
+    ]
+  ]
 
+cabal
+  :: [String]
+  -- ^ Library modules
+  -> A.Cabal
+cabal ms = A.empty
+  { A.cProperties = properties
+  , A.cRepositories = [repo]
+  , A.cLibrary = Just $ library ms
+  }
+
+main :: IO ()
+main = do
+  ms <- A.modules "lib"
+  A.render "genCabal.hs" $ cabal ms
