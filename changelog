@@ -1,3 +1,7 @@
+0.14.0.2
+  * Change dependency bounds
+  * Change cabal generator to cartel
+
 0.14.0.0
 
   * Change Chunk to hold a list of strict Text rather
