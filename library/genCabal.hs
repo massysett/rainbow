@@ -6,17 +6,8 @@ import qualified Cartel as A
 import CabalCommon
 
 properties :: A.Properties
-properties = A.empty
+properties = sharedProperties
   { A.prName = "rainbow"
-  , A.prVersion = version
-  , A.prLicense = A.BSD3
-  , A.prLicenseFile = "LICENSE"
-  , A.prCopyright = "Copyright 2013 - 2014 Omari Norman"
-  , A.prAuthor = "Omari Norman"
-  , A.prMaintainer = "omari@smileystation.com"
-  , A.prStability = "Experimental"
-  , A.prHomepage = "http://www.github.com/massysett/rainbow"
-  , A.prBugReports = "http://www.github.com/massyett/rainbow/issues"
   , A.prSynopsis = "Print text to terminal with colors and effects"
   , A.prDescription =
     [ "rainbow helps you print Text chunks to a terminal with colors and effects"
@@ -30,7 +21,6 @@ properties = A.empty
     , "ncurses headers (for instance, on Debian systems, install the"
     , "libncurses5-dev package.)"
     ]
-  , A.prCategory = "System"
   , A.prTestedWith =
     map (\ls -> (A.GHC, A.eq ls))
     [ [7,4,1], [7,6,3], [7,8,2] ]
@@ -42,14 +32,6 @@ properties = A.empty
     , "current-versions.txt"
     , "changelog"
     ]
-  }
-
-repo :: A.Repository
-repo = A.empty
-  { A.repoVcs = A.Git
-  , A.repoKind = A.Head
-  , A.repoLocation = "git://github.com/massysett/rainbow.git"
-  , A.repoBranch = "master"
   }
 
 library
