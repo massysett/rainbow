@@ -11,9 +11,6 @@ rainbow = A.exactly "rainbow" versionInts
 quickcheck :: A.Package
 quickcheck = A.closedOpen "QuickCheck" [2,7,5] [2,8]
 
-smallcheck :: A.Package
-smallcheck = A.closedOpen "smallcheck" [1,1,1] [1,2]
-
 properties :: A.Properties
 properties = sharedProperties
   { A.prName = "rainbow-tests"
@@ -40,7 +37,6 @@ library ms = A.Library
     , text
     , rainbow
     , quickcheck
-    , smallcheck
     ]
   ]
 
