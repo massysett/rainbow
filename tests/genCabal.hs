@@ -14,11 +14,19 @@ quickcheck = A.closedOpen "QuickCheck" [2,7,5] [2,8]
 properties :: A.Properties
 properties = sharedProperties
   { A.prName = "rainbow-tests"
-  , A.prSynopsis = "Tests and QuickCheck instances to accompany rainbow."
+  , A.prSynopsis = "Tests and QuickCheck generators to accompany rainbow."
+  , A.prDescription =
+    [ "These are packaged separately so other packages may depend"
+    , "on them."
+    ]
 
   , A.prExtraSourceFiles =
     [ "README.md"
     , "changelog"
+    , "current-versions.txt"
+    , "minimum-versions.txt"
+    , "genCabal.hs"
+    , "sunlight-test.hs"
     ]
   }
 
