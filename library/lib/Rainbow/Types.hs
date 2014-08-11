@@ -15,7 +15,7 @@ import qualified Data.Text.Lazy as XL
 import qualified System.Console.Terminfo as T
 import System.IO as IO
 import System.Environment as Env
-import Rainbow.Colors
+import Data.Word (Word8)
 
 --
 -- Terminal definitions
@@ -70,6 +70,61 @@ type Background8 = Last Color8
 type Background256 = Last Color256
 type Foreground8 = Last Color8
 type Foreground256 = Last Color256
+
+--
+-- Colors
+--
+
+data Enum8
+  = E0
+  | E1
+  | E2
+  | E3
+  | E4
+  | E5
+  | E6
+  | E7
+  deriving (Eq, Ord, Show)
+
+enum8toWord8 :: Enum8 -> Word8
+enum8toWord8 e = case e of
+  E0 -> 0
+  E1 -> 1
+  E2 -> 2
+  E3 -> 3
+  E4 -> 4
+  E5 -> 5
+  E6 -> 6
+  E7 -> 7
+
+-- | Color for an 8-color terminal.
+
+newtype Color8 = Color8
+  { unColor8 :: Maybe Enum8
+  -- ^ Nothing indicates to use the default color for the terminal;
+  -- otherwise, use the corresponding Terminfo 'T.Color'.
+  } deriving (Eq, Ord, Show)
+
+color8toTerminfo :: Color8 -> Maybe T.Color
+color8toTerminfo = fmap (T.ColorNumber . fromIntegral . enum8toWord8)
+  . unColor8
+
+-- | Color for an 256-color terminal.
+
+newtype Color256 = Color256
+  { unColor256 :: Maybe Word8
+  -- ^ Nothing indicates to use the default color for the terminal;
+  -- otherwise, use the corresponding Terminfo 'T.Color'.
+  } deriving (Eq, Ord, Show)
+
+color256toTerminfo :: Color256 -> Maybe T.Color
+color256toTerminfo = fmap (T.ColorNumber . fromIntegral)
+  . unColor256
+
+-- | Any color for an 8-color terminal can also be used in a
+-- 256-color terminal.
+to256 :: Color8 -> Color256
+to256 (Color8 mayE) = Color256 $ fmap enum8toWord8 mayE
 
 --
 -- Styles

@@ -135,11 +135,31 @@ module Rainbow
   , flash256, flash256off
   , inverse256, inverse256off
 
-  -- * Color chunks
-  -- | All colors are within this module.
-  , module Rainbow.ColorChunks
+  -- * Colors
+  -- ** Colors for 8-color terminals
+
+  , noColor8
+  , black
+  , red
+  , green
+  , yellow
+  , blue
+  , magenta
+  , cyan
+  , white
+
+  -- ** Colors for 256-color terminals
+  , noColor256
+  , grey
+  , brightRed
+  , brightGreen
+  , brightYellow
+  , brightBlue
+  , brightMagenta
+  , brightCyan
+  , brightWhite
 
   ) where
 
 import Rainbow.Types
-import Rainbow.ColorChunks
+import Rainbow.Colors

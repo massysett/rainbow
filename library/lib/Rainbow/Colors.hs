@@ -6,59 +6,10 @@
 -- "Rainbow.ColorChunks" provides.
 module Rainbow.Colors where
 
+import Rainbow.Types
+import Data.Monoid
 import qualified System.Console.Terminfo as T
 import Data.Word (Word8)
-
-data Enum8
-  = E0
-  | E1
-  | E2
-  | E3
-  | E4
-  | E5
-  | E6
-  | E7
-  deriving (Eq, Ord, Show)
-
-enum8toWord8 :: Enum8 -> Word8
-enum8toWord8 e = case e of
-  E0 -> 0
-  E1 -> 1
-  E2 -> 2
-  E3 -> 3
-  E4 -> 4
-  E5 -> 5
-  E6 -> 6
-  E7 -> 7
-
--- | Color for an 8-color terminal.
-
-newtype Color8 = Color8
-  { unColor8 :: Maybe Enum8
-  -- ^ Nothing indicates to use the default color for the terminal;
-  -- otherwise, use the corresponding Terminfo 'T.Color'.
-  } deriving (Eq, Ord, Show)
-
-color8toTerminfo :: Color8 -> Maybe T.Color
-color8toTerminfo = fmap (T.ColorNumber . fromIntegral . enum8toWord8)
-  . unColor8
-
--- | Color for an 256-color terminal.
-
-newtype Color256 = Color256
-  { unColor256 :: Maybe Word8
-  -- ^ Nothing indicates to use the default color for the terminal;
-  -- otherwise, use the corresponding Terminfo 'T.Color'.
-  } deriving (Eq, Ord, Show)
-
-color256toTerminfo :: Color256 -> Maybe T.Color
-color256toTerminfo = fmap (T.ColorNumber . fromIntegral)
-  . unColor256
-
--- | Any color for an 8-color terminal can also be used in a
--- 256-color terminal.
-to256 :: Color8 -> Color256
-to256 (Color8 mayE) = Color256 $ fmap enum8toWord8 mayE
 
 -- * 8 color
 
@@ -117,3 +68,72 @@ brightCyan = Color256 (Just 14)
 
 brightWhite :: Color256
 brightWhite = Color256 (Just 15)
+
+newtype Both = Both Color8
+  deriving (Eq, Ord, Show)
+
+both :: Color8 -> Both
+both = Both
+
+data Enum8
+  = E0
+  | E1
+  | E2
+  | E3
+  | E4
+  | E5
+  | E6
+  | E7
+  deriving (Eq, Ord, Show)
+
+enum8toWord8 :: Enum8 -> Word8
+enum8toWord8 e = case e of
+  E0 -> 0
+  E1 -> 1
+  E2 -> 2
+  E3 -> 3
+  E4 -> 4
+  E5 -> 5
+  E6 -> 6
+  E7 -> 7
+
+-- | Color for an 8-color terminal.
+
+newtype Color8 = Color8
+  { unColor8 :: Maybe Enum8
+  -- ^ Nothing indicates to use the default color for the terminal;
+  -- otherwise, use the corresponding Terminfo 'T.Color'.
+  } deriving (Eq, Ord, Show)
+
+color8toTerminfo :: Color8 -> Maybe T.Color
+color8toTerminfo = fmap (T.ColorNumber . fromIntegral . enum8toWord8)
+  . unColor8
+
+-- | Color for an 256-color terminal.
+
+newtype Color256 = Color256
+  { unColor256 :: Maybe Word8
+  -- ^ Nothing indicates to use the default color for the terminal;
+  -- otherwise, use the corresponding Terminfo 'T.Color'.
+  } deriving (Eq, Ord, Show)
+
+color256toTerminfo :: Color256 -> Maybe T.Color
+color256toTerminfo = fmap (T.ColorNumber . fromIntegral)
+  . unColor256
+
+-- | Any color for an 8-color terminal can also be used in a
+-- 256-color terminal.
+to256 :: Color8 -> Color256
+to256 (Color8 mayE) = Color256 $ fmap enum8toWord8 mayE
+
+instance Color Both where
+  fore (Both c) = fore c <> fore (to256 c)
+  back (Both c) = back c <> back (to256 c)
+
+instance Color Enum8 where
+  back = back . Color8 . Just
+  fore = fore . Color8 . Just
+
+instance Color Word8 where
+  back = back . Color256 . Just
+  fore = fore . Color256 . Just
