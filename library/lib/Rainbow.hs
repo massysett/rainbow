@@ -14,46 +14,74 @@
 -- for 8 and 256 color terminals; for instance, you can have text
 -- appear red on an 8-color terminal but blue on a 256-color terminal.
 --
--- A 'Chunk' is a 'Monoid', so you can combine them using the usual
--- monoid functions, including '<>'. You can create a 'Chunk' with
--- text using 'fromString', but this library is much more usable if
--- you enable the OverloadedStrings GHC extension:
+-- A 'Chunk' is a 'Data.Monoid.Monoid', so you can combine them using
+-- the usual monoid functions, including 'Data.Monoid.<>'. You can
+-- create a 'Chunk' with text using 'Data.String.fromString', but this
+-- library is much more usable if you enable the OverloadedStrings GHC
+-- extension:
 --
 -- > {-# LANGUAGE OverloadedStrings #-}
 --
 -- and all future examples assume you have enabled OverloadedStrings.
+-- You will also want the Monoid module in scope:
+--
+-- > import Data.Monoid
 --
 -- Here are some basic examples:
 --
--- > putChunkLn $ "Some blue text" <> f_blue
--- > putChunkLn $ "Blue on red background" <> f_blue <> b_red
--- > putChunkLn $ "Blue on red, foreground bold" <> f_blue <> b_red <> bold
+-- @
+-- 'putChunkLn' $ "Some blue text" <> 'fore' 'blue'
+-- 'putChunkLn' $ "Blue on red background"
+--                <> 'fore' 'blue' <> 'back' 'red'
+-- 'putChunkLn' $ "Blue on red, foreground bold"
+--                <> 'fore' 'blue' <> 'back' 'red' <> 'bold'
+-- @
 --
 -- But what makes Rainbow a little more interesting is that you can
 -- also specify output for 256-color terminals. To use these examples,
 -- be sure your TERM environment variable is set to something that
 -- supports 256 colors (like @xterm-256color@) before you start GHCi:
 --
--- > putChunkLn $ "Blue on 8-color terminal, red on 256-color terminal"
--- >            <> c8_f_blue <> c256_f_red
+-- @
+-- 'putChunkLn' $ "Blue on 8-color terminal, red on 256-color terminal"
+--                 <> 'fore' 'blue8' <> 'back' ('to256' 'red')
+-- @
+--
+-- To get a 'Color256', which affects only 256-color terminals, there
+-- are some definitions in the module such as 'brightRed'.  You may
+-- also use 'Word8' literals, like this.  You need to specify the type
+-- as it can't be inferred:
+--
+-- @
+-- import Data.Word ('Data.Word.Word8')
+-- 'putChunkLn' $ "Pink on 256-color terminal only"
+--                <> (201 :: 'Data.Word.Word8')
+-- @
 --
 -- If 'mappend' multiple chunks that change the same property, the
 -- rightmost one \"wins\":
 --
--- > putChunkLn $ "This will be blue" <> f_red <> f_blue
+-- @
+-- 'putChunkLn' $ "This will be blue" <> 'red' <> 'blue'
+-- @
 --
 -- This property comes in handy if you want to specify a default color
 -- for 8- and 256-color terminals, then a more specific shade for a
 -- 256-color terminal:
 --
--- > putChunkLn $ "Pink" <> f_red <> c256_f_201
+-- @
+-- 'putChunkLn' $ "Red on 8-color, pink on 256-color"
+--                <> 'red' <> (201 :: 'Data.Word.Word8')
+-- @
 --
 -- However, if you use 'mappend' to add additional 'Chunk's that have
 -- text, the text will be appended:
 --
--- > putChunkLn $ f_green <> "You will see this text "
--- >              <> "and this text too, but it will all be blue"
--- >              <> f_blue
+-- @
+-- 'putChunkLn' $ 'green' <> "You will see this text "
+--              <> "and this text too, but it will all be blue"
+--              <> 'blue'
+-- @
 --
 -- Although one chunk can have different colors on 8- and 256-color
 -- terminals, it cannot have different colors on the same
@@ -99,7 +127,9 @@ module Rainbow
 
   -- | These 'Chunk's affect both 8 and 256 color terminals:
   --
-  -- > putChunkLn $ "bold on 8 and 256 color terminals" <> bold
+  -- @
+  -- 'putChunkLn' $ "bold on 8 and 256 color terminals" <> 'bold'
+  -- @
   --
   -- There are also 'Chunk's to turn an effect off, such as
   -- 'boldOff'. Ordinarily you will not need these because each chunk
@@ -115,7 +145,9 @@ module Rainbow
 
   -- | These 'Chunk's affect 8-color terminals only.
   --
-  -- > putChunkLn $ "Bold on 8 color terminal only" <> bold8
+  -- @
+  -- 'putChunkLn' $ "Bold on 8 color terminal only" <> 'bold8'
+  -- @
 
   , bold8, bold8off
   , underline8, underline8off
@@ -126,9 +158,11 @@ module Rainbow
 
   -- | These 'Chunk's affect 256-color terminals only.
   --
-  -- > putChunkLn $ "Underlined on 256-color terminal, "
-  -- >              <> "bold on 8-color terminal"
-  -- >              <> underlined256 <> bold8
+  -- @
+  -- 'putChunkLn' $ "Underlined on 256-color terminal, "
+  --              <> "bold on 8-color terminal"
+  --              <> 'underline256' <> 'bold8'
+  -- @
 
   , bold256, bold256off
   , underline256, underline256off
@@ -136,9 +170,12 @@ module Rainbow
   , inverse256, inverse256off
 
   -- * Colors
-  -- ** Colors for 8-color terminals
 
-  , noColor8
+  -- ** Changing the foreground and background color
+  , Color(..)
+
+  -- ** Colors for both 8- and 256-color terminals
+  , Both
   , black
   , red
   , green
@@ -148,7 +185,21 @@ module Rainbow
   , cyan
   , white
 
+
+  -- ** Colors for 8-color terminals
+  , Color8
+  , noColor8
+  , black8
+  , red8
+  , green8
+  , yellow8
+  , blue8
+  , magenta8
+  , cyan8
+  , white8
+
   -- ** Colors for 256-color terminals
+  , Color256
   , noColor256
   , grey
   , brightRed
@@ -158,6 +209,7 @@ module Rainbow
   , brightMagenta
   , brightCyan
   , brightWhite
+  , to256
 
   ) where
 

@@ -45,6 +45,7 @@ library ms = A.Library
     , text
     , rainbow
     , quickcheck
+    , barecheck
     ]
   ]
 

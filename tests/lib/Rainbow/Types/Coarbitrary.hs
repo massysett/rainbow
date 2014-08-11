@@ -1,12 +1,29 @@
-module System.Console.Rainbow.Types.Coarbitrary where
+module Rainbow.Types.Coarbitrary where
 
 import Test.QuickCheck
 import Data.Monoid.Coarbitrary
 import Data.Text.Coarbitrary
-import System.Console.Rainbow.Colors.Coarbitrary
-import qualified System.Console.Rainbow.Types as T
-import Rainbow.Tests.Util
-import Prelude hiding (last)
+import qualified Rainbow.Types as T
+import Prelude hiding (last, maybe)
+import Barecheck.Util
+import Prelude.Coarbitrary
+
+enum8 :: T.Enum8 -> Gen b -> Gen b
+enum8 e = case e of
+  T.E0 -> varInt 0
+  T.E1 -> varInt 1
+  T.E2 -> varInt 2
+  T.E3 -> varInt 3
+  T.E4 -> varInt 4
+  T.E5 -> varInt 5
+  T.E6 -> varInt 6
+  T.E7 -> varInt 7
+
+color8 :: T.Color8 -> Gen b -> Gen b
+color8 (T.Color8 me) = maybe enum8 me
+
+color256 :: T.Color256 -> Gen b -> Gen b
+color256 (T.Color256 me) = maybe variant me
 
 styleCommon :: T.StyleCommon -> Gen b -> Gen b
 styleCommon c
@@ -35,4 +52,4 @@ textSpec c
 chunk :: T.Chunk -> Gen b -> Gen b
 chunk c
   = textSpec (T.textSpec c)
-  . coarbitraryList text (T.text c)
+  . list text (T.text c)

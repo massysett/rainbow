@@ -75,6 +75,7 @@ type Foreground256 = Last Color256
 -- Colors
 --
 
+-- | A simple enumeration for eight values.
 data Enum8
   = E0
   | E1
@@ -84,7 +85,7 @@ data Enum8
   | E5
   | E6
   | E7
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Bounded, Enum)
 
 enum8toWord8 :: Enum8 -> Word8
 enum8toWord8 e = case e of
@@ -97,7 +98,8 @@ enum8toWord8 e = case e of
   E6 -> 6
   E7 -> 7
 
--- | Color for an 8-color terminal.
+-- | Color for an 8-color terminal.  Does not affect 256-color
+-- terminals.
 
 newtype Color8 = Color8
   { unColor8 :: Maybe Enum8
@@ -109,7 +111,8 @@ color8toTerminfo :: Color8 -> Maybe T.Color
 color8toTerminfo = fmap (T.ColorNumber . fromIntegral . enum8toWord8)
   . unColor8
 
--- | Color for an 256-color terminal.
+-- | Color for an 256-color terminal.  Does not affect 8-color
+-- terminals.
 
 newtype Color256 = Color256
   { unColor256 :: Maybe Word8
