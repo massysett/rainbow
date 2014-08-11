@@ -60,7 +60,7 @@
 -- terminal. That is, if you want to print some text in one color and
 -- some text in another color, make two chunks.
 
-module System.Console.Rainbow
+module Rainbow
   (
 
   -- * Terminal definitions
@@ -137,9 +137,9 @@ module System.Console.Rainbow
 
   -- * Color chunks
   -- | All colors are within this module.
-  , module System.Console.Rainbow.ColorChunks
+  , module Rainbow.ColorChunks
 
   ) where
 
-import System.Console.Rainbow.Types
-import System.Console.Rainbow.ColorChunks
+import Rainbow.Types
+import Rainbow.ColorChunks

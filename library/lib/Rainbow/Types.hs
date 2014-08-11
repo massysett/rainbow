@@ -1,8 +1,8 @@
 -- | The innards of Rainbow.  Ordinarily you should not need this
--- module; instead, just import "System.Console.Rainbow", which
+-- module; instead, just import "Rainbow", which
 -- re-exports the most useful names from this module.
 
-module System.Console.Rainbow.Types where
+module Rainbow.Types where
 
 -- # Imports
 
@@ -15,7 +15,7 @@ import qualified Data.Text.Lazy as XL
 import qualified System.Console.Terminfo as T
 import System.IO as IO
 import System.Environment as Env
-import System.Console.Rainbow.Colors
+import Rainbow.Colors
 
 --
 -- Terminal definitions
@@ -196,7 +196,7 @@ commonAttrs t s =
         , T.protectedAttr = False
         }
   in case T.getCapability t (T.setAttributes) of
-      Nothing -> error $ "System.Console.Rainbow: commonAttrs: "
+      Nothing -> error $ "Rainbow: commonAttrs: "
                  ++ "capability failed; should never happen"
       Just f -> f a
 
@@ -218,12 +218,12 @@ getTermCodes t ts = fromMaybe mempty $ do
   setFg <- T.getCapability t T.setForegroundColor
   setBg <- T.getCapability t T.setBackgroundColor
   (fg, bg, cm) <- case () of
-    _ | cols >= 256 -> Just $ ( fmap unColor256 $ getLast f256
-                              , fmap unColor256 $ getLast b256
+    _ | cols >= 256 -> Just $ ( fmap color256toTerminfo $ getLast f256
+                              , fmap color256toTerminfo $ getLast b256
                               , c256)
-      | cols >= 8 -> Just ( fmap unColor8 $ getLast f8
-                         , fmap unColor8 $ getLast b8
-                         , c8)
+      | cols >= 8 -> Just ( fmap color8toTerminfo $ getLast f8
+                          , fmap color8toTerminfo $ getLast b8
+                          , c8)
       | otherwise -> Nothing
   let oFg = maybe mempty (maybe mempty setFg) fg
       oBg = maybe mempty (maybe mempty setBg) bg
@@ -253,7 +253,7 @@ hPutChunks h t cs = do
   T.hRunTermOutput h term (defaultColors term)
   T.hRunTermOutput h term
     $ case T.getCapability term T.allAttributesOff of
-        Nothing -> error $ "System.Console.Rainbow.putChunks: error: "
+        Nothing -> error $ "Rainbow.putChunks: error: "
                    ++ "allAttributesOff failed"
         Just s -> s
 
