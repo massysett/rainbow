@@ -1,7 +1,7 @@
 This package was tested to work with these dependency
 versions and compiler version.
 These are the minimum versions given in the .cabal file.
-Tested as of: 2014-07-13 15:21:37.859452 UTC
+Tested as of: 2014-08-12 01:34:46.415423 UTC
 Path to compiler: ghc-7.4.1
 Compiler description: 7.4.1
 
@@ -33,11 +33,12 @@ Compiler description: 7.4.1
     time-1.4
     unix-2.5.1.0
 
-/home/massysett/rainbow/tests/sunlight-5537/db:
+/home/massysett/rainbow/tests/sunlight-1087/db:
     QuickCheck-2.7.5
+    barecheck-0.2.0.0
     primitive-0.5.3.0
-    rainbow-0.14.0.2
-    rainbow-tests-0.14.0.2
+    rainbow-0.16.0.0
+    rainbow-tests-0.16.0.0
     random-1.0.1.1
     terminfo-0.3.2
     text-0.11.2.0
