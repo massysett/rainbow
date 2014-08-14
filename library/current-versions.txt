@@ -1,7 +1,7 @@
 This package was tested to work with these dependency
 versions and compiler version.
 These are the default versions fetched by cabal install.
-Tested as of: 2014-08-12 01:18:25.411973 UTC
+Tested as of: 2014-08-14 18:19:57.496926 UTC
 Path to compiler: ghc-7.8.3
 Compiler description: 7.8.3
 
@@ -36,7 +36,7 @@ Compiler description: 7.8.3
     unix-2.7.0.1
     xhtml-3000.2.1
 
-/home/massysett/rainbow/library/sunlight-26084/db:
-    rainbow-0.16.0.0
+/home/massysett/rainbow/library/sunlight-20173/db:
+    rainbow-0.16.2.0
     text-1.1.1.3
 
