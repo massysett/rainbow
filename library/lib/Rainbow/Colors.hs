@@ -4,6 +4,7 @@
 -- "Rainbow" does not re-export.
 module Rainbow.Colors where
 
+import Data.Maybe (fromMaybe)
 import Rainbow.Types
 import Data.Monoid
 import Data.Word (Word8)
@@ -76,11 +77,14 @@ brightWhite = Color256 (Just 15)
 
 -- | Things of type 'Both' affect both 8- and 256-color terminals.
 -- (They do /not/ affect both the foreground and background.)
-newtype Both = Both Color8
-  deriving (Eq, Ord, Show)
+data Both = Both
+  { both8 :: Color8
+  , both256 :: Maybe Color256
+  -- ^ If 'Nothing', use the 'both8' color on 256-color terminals.
+  } deriving (Eq, Ord, Show)
 
 both :: Color8 -> Both
-both = Both
+both c8 = Both c8 Nothing
 
 black :: Both
 black = both black8
@@ -158,8 +162,10 @@ instance Color Color256 where
 -- | Affects the foreground and background of both 8- and 256-color
 -- terminals.
 instance Color Both where
-  fore (Both c) = fore c <> fore (to256 c)
-  back (Both c) = back c <> back (to256 c)
+  fore (Both c8 mc256) = fore c8
+    <> fore (fromMaybe (to256 c8) mc256)
+  back (Both c8 mc256) = back c8
+    <> back (fromMaybe (to256 c8) mc256)
 
 -- | Affects the foreground and background of 8-color terminals.
 instance Color Enum8 where

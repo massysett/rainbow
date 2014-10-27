@@ -55,14 +55,14 @@
 -- @
 -- import Data.Word ('Data.Word.Word8')
 -- 'putChunkLn' $ "Pink on 256-color terminal only"
---                <> (201 :: 'Data.Word.Word8')
+--                <> 'fore' (201 :: 'Data.Word.Word8')
 -- @
 --
 -- If 'mappend' multiple chunks that change the same property, the
 -- rightmost one \"wins\":
 --
 -- @
--- 'putChunkLn' $ "This will be blue" <> 'red' <> 'blue'
+-- 'putChunkLn' $ "This will be blue" <> 'fore' 'red' <> 'fore' 'blue'
 -- @
 --
 -- This property comes in handy if you want to specify a default color
@@ -71,16 +71,16 @@
 --
 -- @
 -- 'putChunkLn' $ "Red on 8-color, pink on 256-color"
---                <> 'red' <> (201 :: 'Data.Word.Word8')
+--                <> 'fore' 'red' <> 'fore' (201 :: 'Data.Word.Word8')
 -- @
 --
 -- However, if you use 'mappend' to add additional 'Chunk's that have
 -- text, the text will be appended:
 --
 -- @
--- 'putChunkLn' $ 'green' <> "You will see this text "
+-- 'putChunkLn' $ 'fore' 'green' <> "You will see this text "
 --              <> "and this text too, but it will all be blue"
---              <> 'blue'
+--              <> 'fore' 'blue'
 -- @
 --
 -- Although one chunk can have different colors on 8- and 256-color
@@ -175,7 +175,7 @@ module Rainbow
   , Color(..)
 
   -- ** Colors for both 8- and 256-color terminals
-  , Both
+  , Both(..)
   , black
   , red
   , green

@@ -3,7 +3,7 @@ module CabalCommon where
 import qualified Cartel as A
 
 versionInts :: [Int]
-versionInts = [0,16,2,0]
+versionInts = [0,18,0,0]
 
 -- Package version
 version :: A.Version
