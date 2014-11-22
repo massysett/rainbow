@@ -52,11 +52,11 @@
 -- also use 'Word8' literals, like this.  You need to specify the type
 -- as it can't be inferred:
 --
---
+-- @
 -- import Data.Word ('Data.Word.Word8')
 -- 'putChunkLn' $ \"Pink on 256-color terminal only\"
 --                \<> 'fore' (201 :: 'Data.Word.Word8')
---
+-- @
 --
 -- If 'mappend' multiple chunks that change the same property, the
 -- rightmost one \"wins\":
@@ -128,46 +128,41 @@ module Rainbow
   -- | These 'Chunk's affect both 8 and 256 color terminals:
   --
   -- @
-  -- 'putChunkLn' $ "bold on 8 and 256 color terminals" <> 'bold'
+  -- 'putChunkLn' $ \"bold on 8 and 256 color terminals\" \<> 'bold'
   -- @
-  --
-  -- There are also 'Chunk's to turn an effect off, such as
-  -- 'boldOff'. Ordinarily you will not need these because each chunk
-  -- starts with no effects, so you only need to turn on the effects
-  -- you want. However the @off@ 'Chunk's are here if you need them.
 
-  , bold, boldOff
-  , underline, underlineOff
-  , flash, flashOff
-  , inverse, inverseOff
+  , bold
+  , underline
+  , flash
+  , inverse
 
   -- * Effects for 8-color terminals only
 
   -- | These 'Chunk's affect 8-color terminals only.
   --
   -- @
-  -- 'putChunkLn' $ "Bold on 8 color terminal only" <> 'bold8'
+  -- 'putChunkLn' $ \"Bold on 8 color terminal only\" \<> 'bold8'
   -- @
 
-  , bold8, bold8off
-  , underline8, underline8off
-  , flash8, flash8off
-  , inverse8, inverse8off
+  , bold8
+  , underline8
+  , flash8
+  , inverse8
 
   -- * Effects for 256-color terminals only
 
   -- | These 'Chunk's affect 256-color terminals only.
   --
   -- @
-  -- 'putChunkLn' $ "Underlined on 256-color terminal, "
-  --              <> "bold on 8-color terminal"
-  --              <> 'underline256' <> 'bold8'
+  -- 'putChunkLn' $ \"Underlined on 256-color terminal, \"
+  --              \<> \"bold on 8-color terminal\"
+  --              \<> 'underline256' \<> 'bold8'
   -- @
 
-  , bold256, bold256off
-  , underline256, underline256off
-  , flash256, flash256off
-  , inverse256, inverse256off
+  , bold256
+  , underline256
+  , flash256
+  , inverse256
 
   -- * Colors
 
@@ -175,7 +170,7 @@ module Rainbow
   , Color(..)
 
   -- ** Colors for both 8- and 256-color terminals
-  , Both(..)
+  , Radiant(..)
   , black
   , red
   , green
@@ -186,10 +181,9 @@ module Rainbow
   , white
 
 
-  -- ** Colors for 8-color terminals
+  -- ** Colors for 8-color terminals only
   , Enum8(..)
   , Color8(..)
-  , noColor8
   , black8
   , red8
   , green8
@@ -199,9 +193,8 @@ module Rainbow
   , cyan8
   , white8
 
-  -- ** Colors for 256-color terminals
+  -- ** Colors for 256-color terminals only
   , Color256(..)
-  , noColor256
   , grey
   , brightRed
   , brightGreen

@@ -75,39 +75,41 @@ brightWhite = Color256 (Just 15)
 
 -- * Both 8- and 256-color terminals
 
--- | Things of type 'Both' affect both 8- and 256-color terminals.
--- (They do /not/ affect both the foreground and background.)
-data Both = Both
-  { both8 :: Color8
-  , both256 :: Maybe Color256
-  -- ^ If 'Nothing', use the 'both8' color on 256-color terminals.
+-- | A 'Radiant' affects both 8- and 256-color terminals.  (It does
+-- /not/ necessarily affect both the foreground and background;
+-- whether it affects the foreground, background, or both depends upon
+-- the context in which it is used.)
+data Radiant = Radiant
+  { rad8 :: Color8
+  , rad256 :: Maybe Color256
+  -- ^ If 'Nothing', use the 'rad8' color on 256-color terminals.
   } deriving (Eq, Ord, Show)
 
-both :: Color8 -> Both
-both c8 = Both c8 Nothing
+both :: Color8 -> Radiant
+both c8 = Radiant c8 Nothing
 
-black :: Both
+black :: Radiant
 black = both black8
 
-red :: Both
+red :: Radiant
 red = both red8
 
-green :: Both
+green :: Radiant
 green = both green8
 
-yellow :: Both
+yellow :: Radiant
 yellow = both yellow8
 
-blue :: Both
+blue :: Radiant
 blue = both blue8
 
-magenta :: Both
+magenta :: Radiant
 magenta = both magenta8
 
-cyan :: Both
+cyan :: Radiant
 cyan = both cyan8
 
-white :: Both
+white :: Radiant
 white = both white8
 
 -- | Changing colors.  Instances of this class affect the background
@@ -161,10 +163,10 @@ instance Color Color256 where
 
 -- | Affects the foreground and background of both 8- and 256-color
 -- terminals.
-instance Color Both where
-  fore (Both c8 mc256) = fore c8
+instance Color Radiant where
+  fore (Radiant c8 mc256) = fore c8
     <> fore (fromMaybe (to256 c8) mc256)
-  back (Both c8 mc256) = back c8
+  back (Radiant c8 mc256) = back c8
     <> back (fromMaybe (to256 c8) mc256)
 
 -- | Affects the foreground and background of 8-color terminals.

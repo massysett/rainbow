@@ -48,9 +48,6 @@ termFromEnv = do
 -- | Gets the terminal definition from the environment and a handle.
 -- If the handle is not a terminal, 'Dumb' is returned.  Otherwise,
 -- the terminal is obtained from the environment.
---
--- /Changed in version 0.12.0.0/ - the type of this function was
--- different in previous versions.
 smartTermFromEnv
   :: IO.Handle
   -- ^ Check this handle to see if it is a terminal (typically you
