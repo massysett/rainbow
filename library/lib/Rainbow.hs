@@ -30,11 +30,11 @@
 -- Here are some basic examples:
 --
 -- @
--- 'putChunkLn' $ "Some blue text" <> 'fore' 'blue'
--- 'putChunkLn' $ "Blue on red background"
---                <> 'fore' 'blue' <> 'back' 'red'
--- 'putChunkLn' $ "Blue on red, foreground bold"
---                <> 'fore' 'blue' <> 'back' 'red' <> 'bold'
+-- 'putChunkLn' $ \"Some blue text\" \<> 'fore' 'blue'
+-- 'putChunkLn' $ \"Blue on red background\"
+--               \<> 'fore' 'blue' \<> 'back' 'red'
+-- 'putChunkLn' $ \"Blue on red, foreground bold\"
+--                \<> 'fore' 'blue' \<> 'back' 'red' \<> 'bold'
 -- @
 --
 -- But what makes Rainbow a little more interesting is that you can
@@ -43,8 +43,8 @@
 -- supports 256 colors (like @xterm-256color@) before you start GHCi:
 --
 -- @
--- 'putChunkLn' $ "Blue on 8-color terminal, red on 256-color terminal"
---                 <> 'fore' 'blue8' <> 'back' ('to256' 'red')
+-- 'putChunkLn' $ \"Blue on 8-color terminal, red on 256-color terminal\"
+--                 \<> 'fore' 'blue8' \<> 'fore' ('to256' 'red8')
 -- @
 --
 -- To get a 'Color256', which affects only 256-color terminals, there
@@ -52,17 +52,17 @@
 -- also use 'Word8' literals, like this.  You need to specify the type
 -- as it can't be inferred:
 --
--- @
+--
 -- import Data.Word ('Data.Word.Word8')
--- 'putChunkLn' $ "Pink on 256-color terminal only"
---                <> 'fore' (201 :: 'Data.Word.Word8')
--- @
+-- 'putChunkLn' $ \"Pink on 256-color terminal only\"
+--                \<> 'fore' (201 :: 'Data.Word.Word8')
+--
 --
 -- If 'mappend' multiple chunks that change the same property, the
 -- rightmost one \"wins\":
 --
 -- @
--- 'putChunkLn' $ "This will be blue" <> 'fore' 'red' <> 'fore' 'blue'
+-- 'putChunkLn' $ \"This will be blue\" \<> 'fore' 'red' \<> 'fore' 'blue'
 -- @
 --
 -- This property comes in handy if you want to specify a default color
@@ -70,17 +70,17 @@
 -- 256-color terminal:
 --
 -- @
--- 'putChunkLn' $ "Red on 8-color, pink on 256-color"
---                <> 'fore' 'red' <> 'fore' (201 :: 'Data.Word.Word8')
+-- 'putChunkLn' $ \"Red on 8-color, pink on 256-color\"
+--                \<> 'fore' 'red' \<> 'fore' (201 :: 'Data.Word.Word8')
 -- @
 --
 -- However, if you use 'mappend' to add additional 'Chunk's that have
 -- text, the text will be appended:
 --
 -- @
--- 'putChunkLn' $ 'fore' 'green' <> "You will see this text "
---              <> "and this text too, but it will all be blue"
---              <> 'fore' 'blue'
+-- 'putChunkLn' $ 'fore' 'green' \<> \"You will see this text \"
+--              \<> \"and this text too, but it will all be blue\"
+--              \<> 'fore' 'blue'
 -- @
 --
 -- Although one chunk can have different colors on 8- and 256-color
