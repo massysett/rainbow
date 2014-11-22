@@ -6,6 +6,6 @@ import qualified Rainbow.Types.Generators as G
 import Control.Monad
 import qualified Prelude.Generators
 
-both :: Gen C.Both
-both = liftM2 C.Both G.color8
+radiant :: Gen C.Radiant
+radiant = liftM2 C.Radiant G.color8
   (Prelude.Generators.maybe G.color256)
