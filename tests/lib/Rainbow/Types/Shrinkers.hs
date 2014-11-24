@@ -3,6 +3,11 @@ module Rainbow.Types.Shrinkers where
 import Data.Text.Shrinkers
 import Data.Monoid.Shrinkers
 import Test.QuickCheck
+  ( shrinkIntegral, shrink )
+
+-- be sure to import shrinkList from Test.QuickCheck.Arbitrary to
+-- maintain compatibility between QuickCheck 2.6 and 2.7
+import Test.QuickCheck.Arbitrary ( shrinkList )
 import qualified Rainbow.Types as T
 import Prelude hiding (last)
 import Prelude.Shrinkers

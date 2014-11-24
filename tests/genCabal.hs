@@ -9,7 +9,7 @@ rainbow :: A.Package
 rainbow = A.exactly "rainbow" versionInts
 
 quickcheck :: A.Package
-quickcheck = A.closedOpen "QuickCheck" [2,7,5] [2,8]
+quickcheck = A.closedOpen "QuickCheck" [2,6] [2,8]
 
 properties :: A.Properties
 properties = sharedProperties
