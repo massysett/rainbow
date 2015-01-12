@@ -321,7 +321,7 @@ hPutChunks h t cs = do
 -- 'TermName', the UNIX terminfo library is used to determine how many
 -- colors the terminal supports. If it supports at least 256 colors,
 -- then 256 colors are used. If it supports at least 8 colors but less
--- than 256 colors, then 256 colors are used. Otherwise, no colors are
+-- than 256 colors, then 8 colors are used. Otherwise, no colors are
 -- used. A runtime error will occur if the 'TermName' is not found in
 -- the system terminal database.
 putChunks :: Term -> [Chunk] -> IO ()
