@@ -60,7 +60,6 @@ properties = blank
 main :: IO ()
 main = defaultMain $ do
   libModules <- modules "lib"
-  testModules <- modules "tests"
   return
     ( properties
     , exposedModules libModules
