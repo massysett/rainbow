@@ -1,3 +1,0 @@
-#!/bin/sh
-
-runghc genCabal.hs > rainbow.cabal

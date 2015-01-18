@@ -1,38 +1,48 @@
 -- Generates a Cabal file using the Cartel package.
 --
--- Written for Cartel version 0.10.0.2.
+-- Written for Cartel version 0.12
 
-import qualified Cartel as A
+import Cartel
 
--- Package version
-version :: A.Version
-version = A.Version [0,14,0,2]
+rainbowVersion :: [Word]
+rainbowVersion = [0,20,0,6]
 
 -- Dependencies
 
-base :: A.Package
-base = A.closedOpen "base" [4,5,0,0] [4,8,0,0]
+base :: Package
+base = closedOpen "base" [4,5,0,0] [4,8,0,0]
 
-terminfo :: A.Package
-terminfo = A.closedOpen "terminfo" [0,3,2] [0,5,0,0]
+terminfo :: Package
+terminfo = closedOpen "terminfo" [0,3,2] [0,5,0,0]
 
-text :: A.Package
-text = A.closedOpen "text" [0,11,2,0] [1,2,0,0]
+text :: Package
+text = closedOpen "text" [0,11,2,0] [1,3,0,0]
 
-properties :: A.Properties
-properties = A.empty
-  { A.prName = "rainbow"
-  , A.prVersion = version
-  , A.prLicense = A.BSD3
-  , A.prLicenseFile = "LICENSE"
-  , A.prCopyright = "Copyright 2013 - 2014 Omari Norman"
-  , A.prAuthor = "Omari Norman"
-  , A.prMaintainer = "omari@smileystation.com"
-  , A.prStability = "Experimental"
-  , A.prHomepage = "http://www.github.com/massysett/rainbow"
-  , A.prBugReports = "http://www.github.com/massyett/rainbow/issues"
-  , A.prSynopsis = "Print text to terminal with colors and effects"
-  , A.prDescription =
+commonOptions :: HasBuildInfo a => [a]
+commonOptions =
+  [ haskell2010
+  , ghcOptions ["-Wall"]
+  , buildDepends [base, terminfo, text]
+  , hsSourceDirs ["lib"]
+  ]
+
+properties :: Properties
+properties = blank
+  { name = "rainbow"
+  , version = rainbowVersion
+  , cabalVersion = Just (1,16)
+  , buildType = Just simple
+  , license = Just bsd3
+  , licenseFile = "LICENSE"
+  , copyright = "Copyright 2013-2015 Omari Norman"
+  , author = "Omari Norman"
+  , maintainer = "omari@smileystation.com"
+  , stability = "Experimental"
+  , homepage = "https://www.github.com/massysett/rainbow"
+  , bugReports = "https://www.github.com/massysett/rainbow/issues"
+  , category = "System"
+  , synopsis = "Print text to terminal with colors and effects"
+  , description =
     [ "rainbow helps you print Text chunks to a terminal with colors and effects"
     , "such as bold, underlining, etc. You pair each Text with a description"
     , "of how it should appear. Rainbow works with both 8-color and 256-color"
@@ -44,55 +54,17 @@ properties = A.empty
     , "ncurses headers (for instance, on Debian systems, install the"
     , "libncurses5-dev package.)"
     ]
-  , A.prCategory = "System"
-  , A.prTestedWith =
-    map (\ls -> (A.GHC, A.eq ls))
-    [ [7,4,1], [7,6,3], [7,8,2] ]
-
-  , A.prExtraSourceFiles =
-    [ "README.md"
-    , "sunlight-test.hs"
-    , "minimum-versions.txt"
-    , "current-versions.txt"
-    , "changelog"
-    ]
-  }
-
-repo :: A.Repository
-repo = A.empty
-  { A.repoVcs = A.Git
-  , A.repoKind = A.Head
-  , A.repoLocation = "git://github.com/massysett/rainbow.git"
-  , A.repoBranch = "master"
-  }
-
-library
-  :: [String]
-  -- ^ Library modules
-  -> A.Library
-library ms = A.Library
-  [ A.LibExposedModules ms
-  , A.defaultLanguage A.Haskell2010
-  , A.ghcOptions ["-Wall"]
-  , A.hsSourceDirs ["lib"]
-  , A.buildDepends
-    [ base
-    , terminfo
-    , text
-    ]
-  ]
-
-cabal
-  :: [String]
-  -- ^ Library modules
-  -> A.Cabal
-cabal ms = A.empty
-  { A.cProperties = properties
-  , A.cRepositories = [repo]
-  , A.cLibrary = Just $ library ms
+  , testedWith = map (\ls -> (ghc, eq ls)) [[7,6,3], [7,8,2]]
   }
 
 main :: IO ()
-main = do
-  ms <- A.modules "lib"
-  A.render "genCabal.hs" $ cabal ms
+main = defaultMain $ do
+  libModules <- modules "lib"
+  testModules <- modules "tests"
+  return
+    ( properties
+    , exposedModules libModules
+      : commonOptions
+    , [ githubHead "massysett" "rainbow"
+      ]
+    )
