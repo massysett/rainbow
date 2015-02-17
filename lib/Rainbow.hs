@@ -171,6 +171,7 @@ module Rainbow
 
   -- ** Colors for both 8- and 256-color terminals
   , Radiant(..)
+  , noColorRadiant
   , black
   , red
   , green
@@ -184,6 +185,7 @@ module Rainbow
   -- ** Colors for 8-color terminals only
   , Enum8(..)
   , Color8(..)
+  , noColor8
   , black8
   , red8
   , green8
@@ -195,6 +197,7 @@ module Rainbow
 
   -- ** Colors for 256-color terminals only
   , Color256(..)
+  , noColor256
   , grey
   , brightRed
   , brightGreen

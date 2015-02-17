@@ -85,8 +85,15 @@ data Radiant = Radiant
   -- ^ If 'Nothing', use the 'rad8' color on 256-color terminals.
   } deriving (Eq, Ord, Show)
 
+-- | A Radiant with the same color for both 8- and 256-color
+-- terminals.
 both :: Color8 -> Radiant
 both c8 = Radiant c8 Nothing
+
+-- | A Radiant that uses the terminal's default colors for both 8- and
+-- 256-color terminals.
+noColorRadiant :: Radiant
+noColorRadiant = both noColor8
 
 black :: Radiant
 black = both black8

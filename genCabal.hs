@@ -5,7 +5,7 @@
 import Cartel
 
 rainbowVersion :: [Word]
-rainbowVersion = [0,20,0,6]
+rainbowVersion = [0,20,2,0]
 
 -- Dependencies
 
