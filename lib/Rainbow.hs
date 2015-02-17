@@ -172,6 +172,7 @@ module Rainbow
   -- ** Colors for both 8- and 256-color terminals
   , Radiant(..)
   , noColorRadiant
+  , both
   , black
   , red
   , green
