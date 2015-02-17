@@ -18,6 +18,9 @@ terminfo = closedOpen "terminfo" [0,3,2] [0,5,0,0]
 text :: Package
 text = closedOpen "text" [0,11,2,0] [1,3,0,0]
 
+quickCheck :: Package
+quickCheck = closedOpen "QuickCheck" [2,7] [2,8]
+
 commonOptions :: HasBuildInfo a => [a]
 commonOptions =
   [ haskell2010
@@ -65,5 +68,12 @@ main = defaultMain $ do
     , exposedModules libModules
       : commonOptions
     , [ githubHead "massysett" "rainbow"
+      , testSuite "rainbow-instances" $
+        [ exitcodeStdio
+        , mainIs "rainbow-instances.hs"
+        , otherModules ("Rainbow.QuickCheck" : libModules)
+        , hsSourceDirs ["tests"]
+        , buildDepends [quickCheck]
+        ] ++ commonOptions
       ]
     )
