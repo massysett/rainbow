@@ -295,9 +295,8 @@ hPrintChunk h t (Chunk ts xs) =
     codes = getTermCodes t ts
 
 -- | Sends a list of chunks to the given handle for printing. Sets up
--- the terminal (this only needs to be done once.) Lazily processes
--- the list of Chunk. See 'putChunks' for notes on how many colors
--- are used.
+-- the terminal (this only needs to be done once.)  See 'putChunks'
+-- for notes on how many colors are used.
 hPutChunks :: IO.Handle -> Term -> [Chunk] -> IO ()
 hPutChunks h t cs = do
   let setup = case t of
@@ -313,8 +312,7 @@ hPutChunks h t cs = do
         Just s -> s
 
 -- | Sends a list of chunks to standard output for printing. Sets up
--- the terminal (this only needs to be done once.) Lazily processes
--- the list of Chunk.
+-- the terminal (this only needs to be done once.)
 --
 -- Which colors are used depends upon the 'Term'. If it is 'Dumb',
 -- then no colors are used on output. If the 'Term' is specified with

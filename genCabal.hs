@@ -18,6 +18,9 @@ terminfo = closedOpen "terminfo" [0,3,2] [0,5,0,0]
 text :: Package
 text = closedOpen "text" [0,11,2,0] [1,3,0,0]
 
+bytestring :: Package
+bytestring = closedOpen "bytestring" [0,10] [0,11]
+
 quickCheck :: Package
 quickCheck = closedOpen "QuickCheck" [2,7] [2,8]
 
@@ -25,7 +28,7 @@ commonOptions :: HasBuildInfo a => [a]
 commonOptions =
   [ haskell2010
   , ghcOptions ["-Wall"]
-  , buildDepends [base, terminfo, text]
+  , buildDepends [base, terminfo, text, bytestring]
   , hsSourceDirs ["lib"]
   ]
 
