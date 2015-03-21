@@ -217,7 +217,7 @@ module Rainbow
   , chunksToByteStrings
 
   -- * Re-exports
-  -- | "Data.Monoid" re-exports '<>'
+  -- | "Data.Monoid" re-exports '<>' and 'mempty'
   , module Data.Monoid
 
   ) where
@@ -231,4 +231,4 @@ import Rainbow.Translate
   , toByteStringsColors256
   , chunksToByteStrings
   )
-import Data.Monoid ((<>))
+import Data.Monoid ((<>), mempty)

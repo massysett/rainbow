@@ -57,14 +57,35 @@ properties = blank
   , testedWith = map (\ls -> (ghc, eq ls)) [[7,6,3], [7,8,2]]
   }
 
+visualTest
+  :: FlagName
+  -- ^ Visual flag
+  -> [NonEmptyString]
+  -- ^ Library modules
+  -> String
+  -- ^ Name of executable
+  -> Section
+visualTest fl libMods nm = executable nm $
+  [ mainIs (nm ++ ".hs")
+  , condBlock (flag fl)
+    ( buildable True
+    , [ otherModules libMods
+      , hsSourceDirs ["tests"]
+      ] ++ commonOptions
+    )
+    [ buildable False ]
+  ]
+
 main :: IO ()
 main = defaultMain $ do
   libModules <- modules "lib"
+  flTests <- makeFlag "visual" (FlagOpts "builds visual tests" False True)
   return
     ( properties
     , exposedModules libModules
       : commonOptions
     , [ githubHead "massysett" "rainbow"
+
       , testSuite "rainbow-instances" $
         [ exitcodeStdio
         , mainIs "rainbow-instances.hs"
@@ -72,5 +93,7 @@ main = defaultMain $ do
         , hsSourceDirs ["tests"]
         , buildDepends [quickCheck]
         ] ++ commonOptions
-      ]
+
+      ] ++ map (visualTest flTests libModules) [ "test8color" ]
+
     )
