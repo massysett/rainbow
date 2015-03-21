@@ -209,7 +209,7 @@ textSpec256 = style256 . T.style256
 -- colors.  When applied to a 'T.Chunk', this function returns a
 -- difference list.
 toByteStringsColors0 :: T.Chunk -> [ByteString] -> [ByteString]
-toByteStringsColors0 c = ((map encodeUtf8 . T.text $ c) ++)
+toByteStringsColors0 c = ((map encodeUtf8 . T.chunkTexts $ c) ++)
 
 -- | Convert a 'T.Chunk' to a list of 'ByteString'; show eight
 -- colors.  When applied to a 'T.Chunk', this function returns a
@@ -217,8 +217,8 @@ toByteStringsColors0 c = ((map encodeUtf8 . T.text $ c) ++)
 toByteStringsColors8 :: T.Chunk -> [ByteString] -> [ByteString]
 toByteStringsColors8 c
   = normalDefault
-  . textSpec8 (T.textSpec c)
-  . ((map encodeUtf8 . T.text $ c) ++)
+  . textSpec8 (T.chunkTextSpec c)
+  . ((map encodeUtf8 . T.chunkTexts $ c) ++)
   . normalDefault
 
 -- | Convert a 'T.Chunk' to a list of 'ByteString'; show 256
@@ -227,8 +227,8 @@ toByteStringsColors8 c
 toByteStringsColors256 :: T.Chunk -> [ByteString] -> [ByteString]
 toByteStringsColors256 c
   = normalDefault
-  . textSpec256 (T.textSpec c)
-  . ((map encodeUtf8 . T.text $ c) ++)
+  . textSpec256 (T.chunkTextSpec c)
+  . ((map encodeUtf8 . T.chunkTexts $ c) ++)
   . normalDefault
 
 
@@ -266,6 +266,33 @@ byteStringMakerFromEnvironment
 -- | Convert a list of 'T.Chunk' to a list of 'ByteString'.  The
 -- length of the returned list may be longer than the length of the
 -- input list.
+--
+-- So, for example, to print a bunch of chunks to standard output
+-- using 256 colors:
+--
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- > module PrintMyChunks where
+-- >
+-- > import qualified Data.ByteString as BS
+-- > import Rainbow
+-- >
+-- > myChunks :: [Chunk]
+-- > myChunks = [ "Roses" <> fore red, "\n", "Violets" <> fore blue, "\n" ]
+-- >
+-- > myPrintedChunks :: IO ()
+-- > myPrintedChunks = mapM_ BS.putStr
+-- >                 . chunksToByteStrings toByteStringsColors256
+-- >                 $ myChunks
+--
+-- To use the highest number of colors that this terminal supports:
+--
+-- > myPrintedChunks' :: IO ()
+-- > myPrintedChunks' = do
+-- >   printer <- byteStringMakerFromEnvironment
+-- >   mapM_ BS.putStr
+-- >     . chunksToByteStrings printer
+-- >     $ myChunks
+
 chunksToByteStrings
   :: (T.Chunk -> [ByteString] -> [ByteString])
   -- ^ Function that converts 'T.Chunk' to 'ByteString'.  This

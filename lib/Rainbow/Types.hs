@@ -156,27 +156,50 @@ instance Monoid TextSpec where
 -- underlined, etc. The chunk knows what foreground and background
 -- colors and what attributes to use for both an 8 color terminal and
 -- a 256 color terminal.
---
--- The text is held as a list of strict 'Text'.
 
 data Chunk = Chunk
-  { textSpec :: TextSpec
-  , text :: [Text]
+  { chunkTextSpec :: TextSpec
+    -- ^ Specifies all the effects (such as bold, underlining,
+    -- colors, etc) that apply to this chunk, with different effects for
+    -- 8 and 256 color terminals; and
+    --
+  , chunkTexts :: [Text]
+    -- The text that is in this chunk.  When printing the
+    -- 'Chunk', first all colors and effects on the terminal are reset.
+    -- Then, the effects in the 'TextSpec' are applied, and then the
+    -- 'Text's are printed by encoding them to UTF-8.  Then, all the
+    -- colors and effects on the terminal are again reset.
+    --
+    -- Each text in this list is a strict 'X.Text'; though there is no
+    -- provision for lazy 'X.Text', you can get the same effect as a lazy
+    -- 'X.Text' by using a list of strict 'X.Text'.  'chunkFromLazyText'
+    -- 'Text' by using a list of strict 'and 'chunkFromLazyTexts' do
+    -- 'Text' by using a list of strict 'this for you.
   } deriving (Eq, Show, Ord)
-
+  
 
 instance Str.IsString Chunk where
   fromString s = Chunk mempty [(X.pack s)]
 
 -- | Creates a 'Chunk' from a strict 'X.Text' with default colors
 -- and no special effects.
-fromText :: Text -> Chunk
-fromText = Chunk mempty . (:[])
+chunkFromText :: X.Text -> Chunk
+chunkFromText = Chunk mempty . (:[])
+
+-- | Creates a 'Chunk' from a list of strict 'X.Text' with default
+-- colors and no special effects.
+chunkFromTexts :: [X.Text] -> Chunk
+chunkFromTexts = Chunk mempty
 
 -- | Creates a 'Chunk' from a lazy 'XL.Text' with default colors and
 -- no special effects.
-fromLazyText :: XL.Text -> Chunk
-fromLazyText = Chunk mempty . XL.toChunks
+chunkFromLazyText :: XL.Text -> Chunk
+chunkFromLazyText = Chunk mempty . XL.toChunks
+
+-- | Creates a 'Chunk' from a list of lazy 'XL.Text' with default
+-- colors and no special effects.
+chunkFromLazyTexts :: [XL.Text] -> Chunk
+chunkFromLazyTexts = Chunk mempty . concatMap XL.toChunks
 
 instance Monoid Chunk where
   mempty = Chunk mempty mempty
@@ -187,54 +210,54 @@ instance Monoid Chunk where
 
 bold8 :: Chunk
 bold8 = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scBold = Last (Just True) }}}}
   where
     x = mempty
 
 bold8off :: Chunk
 bold8off = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scBold = Last (Just False) }}}}
   where
     x = mempty
 
 faint8 :: Chunk
 faint8 = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scFaint = Last (Just True) }}}}
   where
     x = mempty
 
 faint8off :: Chunk
 faint8off = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scFaint = Last (Just False) }}}}
   where
     x = mempty
 
 italic8 :: Chunk
 italic8 = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scItalic = Last (Just True) }}}}
   where
     x = mempty
 
 italic8off :: Chunk
 italic8off = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scItalic = Last (Just False) }}}}
   where
     x = mempty
@@ -242,9 +265,9 @@ italic8off = x {
 
 underline8 :: Chunk
 underline8 = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scUnderline = Last (Just True) }}}}
   where
     x = mempty
@@ -252,27 +275,27 @@ underline8 = x {
 
 underline8off :: Chunk
 underline8off = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scUnderline = Last (Just False) }}}}
   where
     x = mempty
 
 blink8 :: Chunk
 blink8 = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scBlink = Last (Just True) }}}}
   where
     x = mempty
 
 blink8off :: Chunk
 blink8off = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scBlink = Last (Just False) }}}}
   where
     x = mempty
@@ -280,18 +303,18 @@ blink8off = x {
 
 inverse8 :: Chunk
 inverse8 = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scInverse = Last (Just True) }}}}
   where
     x = mempty
 
 inverse8off :: Chunk
 inverse8off = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scInverse = Last (Just False) }}}}
   where
     x = mempty
@@ -299,18 +322,18 @@ inverse8off = x {
 
 invisible8 :: Chunk
 invisible8 = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scInvisible = Last (Just True) }}}}
   where
     x = mempty
 
 invisible8off :: Chunk
 invisible8off = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scInvisible = Last (Just False) }}}}
   where
     x = mempty
@@ -318,18 +341,18 @@ invisible8off = x {
 
 strikeout8 :: Chunk
 strikeout8 = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scStrikeout = Last (Just True) }}}}
   where
     x = mempty
 
 strikeout8off :: Chunk
 strikeout8off = x {
-  textSpec = (textSpec x) {
-    style8 = (style8 (textSpec x)) {
-      common8 = (common8 (style8 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style8 = (style8 (chunkTextSpec x)) {
+      common8 = (common8 (style8 (chunkTextSpec x))) {
         scStrikeout = Last (Just False) }}}}
   where
     x = mempty
@@ -339,18 +362,18 @@ strikeout8off = x {
 
 bold256 :: Chunk
 bold256 = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scBold = Last (Just True) }}}}
   where
     x = mempty
 
 bold256off :: Chunk
 bold256off = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scBold = Last (Just False) }}}}
   where
     x = mempty
@@ -358,18 +381,18 @@ bold256off = x {
 
 faint256 :: Chunk
 faint256 = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scFaint = Last (Just True) }}}}
   where
     x = mempty
 
 faint256off :: Chunk
 faint256off = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scFaint = Last (Just False) }}}}
   where
     x = mempty
@@ -377,18 +400,18 @@ faint256off = x {
 
 italic256 :: Chunk
 italic256 = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scItalic = Last (Just True) }}}}
   where
     x = mempty
 
 italic256off :: Chunk
 italic256off = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scItalic = Last (Just False) }}}}
   where
     x = mempty
@@ -396,9 +419,9 @@ italic256off = x {
 
 underline256 :: Chunk
 underline256 = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scUnderline = Last (Just True) }}}}
   where
     x = mempty
@@ -406,18 +429,18 @@ underline256 = x {
 
 underline256off :: Chunk
 underline256off = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scUnderline = Last (Just False) }}}}
   where
     x = mempty
 
 blink256 :: Chunk
 blink256 = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scBlink = Last (Just True) }}}}
   where
     x = mempty
@@ -425,9 +448,9 @@ blink256 = x {
 
 blink256off :: Chunk
 blink256off = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scBlink = Last (Just False) }}}}
   where
     x = mempty
@@ -435,18 +458,18 @@ blink256off = x {
 
 inverse256 :: Chunk
 inverse256 = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scInverse = Last (Just True) }}}}
   where
     x = mempty
 
 inverse256off :: Chunk
 inverse256off = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scInverse = Last (Just False) }}}}
   where
     x = mempty
@@ -454,18 +477,18 @@ inverse256off = x {
 
 invisible256 :: Chunk
 invisible256 = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scInvisible = Last (Just True) }}}}
   where
     x = mempty
 
 invisible256off :: Chunk
 invisible256off = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scInvisible = Last (Just False) }}}}
   where
     x = mempty
@@ -473,18 +496,18 @@ invisible256off = x {
 
 strikeout256 :: Chunk
 strikeout256 = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scStrikeout = Last (Just True) }}}}
   where
     x = mempty
 
 strikeout256off :: Chunk
 strikeout256off = x {
-  textSpec = (textSpec x) {
-    style256 = (style256 (textSpec x)) {
-      common256 = (common256 (style256 (textSpec x))) {
+  chunkTextSpec = (chunkTextSpec x) {
+    style256 = (style256 (chunkTextSpec x)) {
+      common256 = (common256 (style256 (chunkTextSpec x))) {
         scStrikeout = Last (Just False) }}}}
   where
     x = mempty

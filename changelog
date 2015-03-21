@@ -1,3 +1,15 @@
+I don't keep the best changelogs.  Remember you can always go to
+hdiff.luite.com to compare different released versions.
+
+0.22.0.0
+
+  * no longer uses Terminfo.  Some breaking changes in how Chunks
+    are printed.
+
+  * added some more effects, such as italics
+
+  * added some tests
+
 0.16.0.0
   * overhauled how colors are stored; much simpler now.  However
     these changes will break old code.

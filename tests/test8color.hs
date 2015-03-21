@@ -54,10 +54,10 @@ colorsAndEffects = do
   (effectName, mayEffect) <- maybeEffects
   let lbl = "foreground " <> fgColorName <> " background " <> bgColorName
           <> " effect " <> effectName
-  return $ fromText lbl <> fore fgColor
+  return $ chunkFromText lbl <> fore fgColor
          <> back bgColor
          <> maybe mempty id mayEffect
-         <> fromText "\n"
+         <> chunkFromText "\n"
 
 main :: IO ()
 main = do

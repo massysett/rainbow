@@ -29,28 +29,28 @@ colorChunks8ByForeground = do
   (fgColorName, fgColor) <- colors8
   (bgColorName, bgColor) <- colors8
   let lbl = "foreground " <> fgColorName <> " background " <> bgColorName
-  return $ fromText lbl <> fore fgColor <> back bgColor <> "\n"
+  return $ chunkFromText lbl <> fore fgColor <> back bgColor <> "\n"
 
 colorChunks8ByBackground :: [Chunk]
 colorChunks8ByBackground = do
   (bgColorName, bgColor) <- colors8
   (fgColorName, fgColor) <- colors8
   let lbl = "background " <> bgColorName <> " foreground " <> fgColorName
-  return $ fromText lbl <> fore fgColor <> back bgColor <> "\n"
+  return $ chunkFromText lbl <> fore fgColor <> back bgColor <> "\n"
 
 colorChunks256ByForeground :: [Chunk]
 colorChunks256ByForeground = do
   (fgColorName, fgColor) <- colors256
   (bgColorName, bgColor) <- colors256
   let lbl = "foreground " <> fgColorName <> " background " <> bgColorName
-  return $ fromText lbl <> fore fgColor <> back bgColor <> "\n"
+  return $ chunkFromText lbl <> fore fgColor <> back bgColor <> "\n"
 
 colorChunks256ByBackground :: [Chunk]
 colorChunks256ByBackground = do
   (bgColorName, bgColor) <- colors256
   (fgColorName, fgColor) <- colors256
   let lbl = "background " <> bgColorName <> " foreground " <> fgColorName
-  return $ fromText lbl <> fore fgColor <> back bgColor <> "\n"
+  return $ chunkFromText lbl <> fore fgColor <> back bgColor <> "\n"
 
 sep :: String -> IO ()
 sep s = do

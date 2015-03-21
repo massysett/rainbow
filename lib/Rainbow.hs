@@ -1,7 +1,4 @@
--- | Handles colors and special effects for text. Internally this
--- module uses the Haskell terminfo library, which links against the
--- UNIX library of the same name, so it should work with a wide
--- variety of UNIX terminals.
+-- | Rainbow handles colors and special effects for text.
 --
 -- The building block of Rainbow is the 'Chunk'. Each 'Chunk' comes with
 -- a 'TextSpec', which specifies how the text should look on 8-color
@@ -14,18 +11,19 @@
 -- for 8 and 256 color terminals; for instance, you can have text
 -- appear red on an 8-color terminal but blue on a 256-color terminal.
 --
--- A 'Chunk' is a 'Data.Monoid.Monoid', so you can combine them using
--- the usual monoid functions, including 'Data.Monoid.<>'. You can
+-- A 'Chunk' is a 'Monoid', so you can combine them using
+-- the usual monoid functions, including '<>'. You can
 -- create a 'Chunk' with text using 'Data.String.fromString', but this
 -- library is much more usable if you enable the OverloadedStrings GHC
 -- extension:
 --
 -- > {-# LANGUAGE OverloadedStrings #-}
 --
--- and all future examples assume you have enabled OverloadedStrings.
--- You will also want the Monoid module in scope:
+-- or, in GHCi:
 --
--- > import Data.Monoid
+-- >>> :set -XOverloadedStrings
+--
+-- and all future examples assume you have enabled OverloadedStrings.
 --
 -- Here are some basic examples:
 --
@@ -40,7 +38,7 @@
 -- But what makes Rainbow a little more interesting is that you can
 -- also specify output for 256-color terminals. To use these examples,
 -- be sure your TERM environment variable is set to something that
--- supports 256 colors (like @xterm-256color@) before you start GHCi:
+-- supports 256 colors (like @xterm-256color@) before you start GHCi.
 --
 -- @
 -- 'putChunkLn' $ \"Blue on 8-color terminal, red on 256-color terminal\"
@@ -53,12 +51,11 @@
 -- as it can't be inferred:
 --
 -- @
--- import Data.Word ('Data.Word.Word8')
 -- 'putChunkLn' $ \"Pink on 256-color terminal only\"
---                \<> 'fore' (201 :: 'Data.Word.Word8')
+--                \<> 'fore' (201 :: 'Word8')
 -- @
 --
--- If 'mappend' multiple chunks that change the same property, the
+-- If you 'mappend' multiple chunks that change the same property, the
 -- rightmost one \"wins\":
 --
 -- @
@@ -71,7 +68,7 @@
 --
 -- @
 -- 'putChunkLn' $ \"Red on 8-color, pink on 256-color\"
---                \<> 'fore' 'red' \<> 'fore' (201 :: 'Data.Word.Word8')
+--                \<> 'fore' 'red' \<> 'fore' (201 :: 'Word8')
 -- @
 --
 -- However, if you use 'mappend' to add additional 'Chunk's that have
@@ -92,9 +89,11 @@ module Rainbow
   (
 
   -- * Chunks
-    Chunk(..)
-  , fromText
-  , fromLazyText
+    Chunk
+  , chunkFromText
+  , chunkFromTexts
+  , chunkFromLazyText
+  , chunkFromLazyTexts
 
   -- * Effects for both 8 and 256 color terminals
 
@@ -205,6 +204,14 @@ module Rainbow
   -- explanation of difference lists:
   --
   -- http://learnyouahaskell.com/for-a-few-monads-more
+  --
+  -- If you don't want to learn about difference lists, just stick
+  -- with using 'chunksToByteStrings' and use
+  -- 'byteStringMakerFromEnvironment' if you want to use the highest
+  -- number of colors possible, or, to manually specify the number of
+  -- colors, use 'chunksToByteStrings' with 'toByteStringsColors0',
+  -- 'toByteStringsColors8', or 'toByteStringsColors256' as the first
+  -- argument.  'chunksToByteStrings' has an example.
   , byteStringMakerFromEnvironment
   , toByteStringsColors0
   , toByteStringsColors8
@@ -227,6 +234,7 @@ module Rainbow
   , module Data.Monoid
   , module Data.ByteString
   , module Data.Text
+  , module Data.Word
 
   -- * Notes on terminals
   -- $termNotes
@@ -244,17 +252,20 @@ import Rainbow.Translate
   , putChunk
   , putChunkLn
   )
-import Data.Monoid ((<>), mempty)
+import Data.Monoid (Monoid, (<>), mempty)
 import Data.Text (Text)
 import Data.ByteString (ByteString)
+import Data.Word (Word8)
 
 {- $reexports
 
-   * "Data.Monoid" re-exports '<>' and 'mempty'
+   * "Data.Monoid" re-exports 'Monoid', '<>' and 'mempty'
 
    * "Data.ByteString" re-exports 'ByteString'
 
    * "Data.Text" re-exports 'Text'
+
+   * "Data.Word" re-exports 'Word8'
 -}
 
 {- $termNotes
@@ -296,6 +307,8 @@ standard ISO 6429 / ECMA 48 terminal codes.  These are the same codes
 that are used by xterm, the OS X Terminal, the Linux console, or any
 other reasonably modern software terminal.  Realistically they are the
 only terminals Rainbow would be used for.
+
+The 256 color capability is not in ISO 6429, but it is widely supported.
 
 Probably the most common so-called terminals in use today that do NOT
 support the ISO 6429 codes are those that are not really terminals.
