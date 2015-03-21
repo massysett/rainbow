@@ -217,8 +217,13 @@ module Rainbow
   , chunksToByteStrings
 
   -- * Re-exports
-  -- | "Data.Monoid" re-exports '<>' and 'mempty'
+  -- $reexports
+  -- | * "Data.Monoid" re-exports '<>' and 'mempty'
+  --
+  -- 
   , module Data.Monoid
+  , module Data.ByteString
+  , module Data.Text
 
   ) where
 
@@ -232,3 +237,14 @@ import Rainbow.Translate
   , chunksToByteStrings
   )
 import Data.Monoid ((<>), mempty)
+import Data.Text (Text)
+import Data.ByteString (ByteString)
+
+{- $reexports
+
+   * "Data.Monoid" re-exports '<>' and 'mempty'
+
+   * "Data.ByteString" re-exports 'ByteString'
+
+   * "Data.Text" re-exports 'Text'
+-}

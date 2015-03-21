@@ -94,6 +94,7 @@ main = defaultMain $ do
         , buildDepends [quickCheck]
         ] ++ commonOptions
 
-      ] ++ map (visualTest flTests libModules) [ "test8color" ]
+      ] ++ map (visualTest flTests libModules)
+               [ "test8color", "test256color", "colorTest" ]
 
     )

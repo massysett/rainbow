@@ -68,62 +68,62 @@ strikeout :: [ByteString] -> [ByteString]
 strikeout = sgrSingle 9
 
 foreBlack :: [ByteString] -> [ByteString]
-foreBlack = sgrDouble 3 0
+foreBlack = sgrSingle 30
 
 foreRed :: [ByteString] -> [ByteString]
-foreRed = sgrDouble 3 1
+foreRed = sgrSingle 31
 
 foreGreen :: [ByteString] -> [ByteString]
-foreGreen = sgrDouble 3 2
+foreGreen = sgrSingle 32
 
 foreYellow :: [ByteString] -> [ByteString]
-foreYellow = sgrDouble 3 3
+foreYellow = sgrSingle 33
 
 foreBlue :: [ByteString] -> [ByteString]
-foreBlue = sgrDouble 3 4
+foreBlue = sgrSingle 34
 
 foreMagenta :: [ByteString] -> [ByteString]
-foreMagenta = sgrDouble 3 5
+foreMagenta = sgrSingle 35
 
 foreCyan :: [ByteString] -> [ByteString]
-foreCyan = sgrDouble 3 6
+foreCyan = sgrSingle 36
 
 foreWhite :: [ByteString] -> [ByteString]
-foreWhite = sgrDouble 3 7
+foreWhite = sgrSingle 37
 
 -- code 3 8 is skipped
 
 foreDefault :: [ByteString] -> [ByteString]
-foreDefault = sgrDouble 3 9
+foreDefault = sgrSingle 39
 
 backBlack :: [ByteString] -> [ByteString]
-backBlack = sgrDouble 4 0
+backBlack = sgrSingle 40
 
 backRed :: [ByteString] -> [ByteString]
-backRed = sgrDouble 4 1
+backRed = sgrSingle 41
 
 backGreen :: [ByteString] -> [ByteString]
-backGreen = sgrDouble 4 2
+backGreen = sgrSingle 42
 
 backYellow :: [ByteString] -> [ByteString]
-backYellow = sgrDouble 4 3
+backYellow = sgrSingle 43
 
 backBlue :: [ByteString] -> [ByteString]
-backBlue = sgrDouble 4 4
+backBlue = sgrSingle 44
 
 backMagenta :: [ByteString] -> [ByteString]
-backMagenta = sgrDouble 4 5
+backMagenta = sgrSingle 45
 
 backCyan :: [ByteString] -> [ByteString]
-backCyan = sgrDouble 4 6
+backCyan = sgrSingle 46
 
 backWhite :: [ByteString] -> [ByteString]
-backWhite = sgrDouble 4 7
+backWhite = sgrSingle 47
 
 -- code 4 8 is skipped
 
 backDefault :: [ByteString] -> [ByteString]
-backDefault = sgrDouble 4 9
+backDefault = sgrSingle 49
 
 fore256 :: Word8 -> [ByteString] -> [ByteString]
 fore256 c = sgr $ params [38,5,c]
@@ -217,6 +217,7 @@ toByteStringsColors8 c
   = normalDefault
   . textSpec8 (T.textSpec c)
   . ((map encodeUtf8 . T.text $ c) ++)
+  . normalDefault
 
 -- | Convert a 'T.Chunk' to a list of 'ByteString'; show 256
 -- colors.  When applied to a 'T.Chunk', this function returns a
@@ -226,6 +227,7 @@ toByteStringsColors256 c
   = normalDefault
   . textSpec256 (T.textSpec c)
   . ((map encodeUtf8 . T.text $ c) ++)
+  . normalDefault
 
 
 -- | Use the Terminfo library to return a function that will convert

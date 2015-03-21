@@ -3,32 +3,25 @@ module Main where
 
 import Control.Arrow (second)
 import Rainbow
+import qualified Data.Text as X
 import qualified Data.ByteString as BS
 
 effects :: [(Text, Chunk)]
 effects =
-  [ ("bold", bold8)
-  , ("faint", faint8)
-  , ("italic", italic8)
-  , ("underline", underline8)
-  , ("blink", blink8)
-  , ("inverse", inverse8)
-  , ("invisible", invisible8)
-  , ("strikeout", strikeout8)
+  [ ("bold", bold256)
+  , ("faint", faint256)
+  , ("italic", italic256)
+  , ("underline", underline256)
+  , ("blink", blink256)
+  , ("inverse", inverse256)
+  , ("invisible", invisible256)
+  , ("strikeout", strikeout256)
   ]
 
-colors :: [(Text, Color8)]
-colors =
-  [ ("(no color)", noColor8)
-  , ("black", black8)
-  , ("red", red8)
-  , ("green", green8)
-  , ("yellow", yellow8)
-  , ("blue", blue8)
-  , ("magenta", magenta8)
-  , ("cyan", cyan8)
-  , ("white", white8)
-  ]
+colors :: [(Text, Color256)]
+colors = ("(no color)", Color256 Nothing) : map mkColor [minBound..maxBound]
+  where
+    mkColor w = (X.pack . show $ w, Color256 . Just $ w)
 
 maybeEffects :: [(Text, Maybe Chunk)]
 maybeEffects = ("(no effect)", Nothing)
@@ -54,12 +47,12 @@ colorsAndEffects = do
   (effectName, mayEffect) <- maybeEffects
   let lbl = "foreground " <> fgColorName <> " background " <> bgColorName
           <> " effect " <> effectName
-  return $ fromText lbl <> fore fgColor
-         <> back bgColor
+  return $ fromText lbl <>  fore fgColor
+         <>  back bgColor
          <> maybe mempty id mayEffect
-         <> fromText "\n"
+         <> "\n"
 
 main :: IO ()
 main = do
-  mapM_ BS.putStr . chunksToByteStrings toByteStringsColors8
+  mapM_ BS.putStr . chunksToByteStrings toByteStringsColors256
     $ colorsAndEffects
