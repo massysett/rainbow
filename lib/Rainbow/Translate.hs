@@ -3,6 +3,7 @@ module Rainbow.Translate where
 
 import Data.Monoid
 import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
 import Data.Word
 import Data.List (intersperse)
@@ -15,6 +16,7 @@ import System.Process
 import Text.Read
 import System.Exit
 import Control.Monad
+import Control.Exception
 
 single :: Char -> [ByteString] -> [ByteString]
 single c = ((BS8.singleton c):)
@@ -230,24 +232,36 @@ toByteStringsColors256 c
   . normalDefault
 
 
--- | Use the Terminfo library to return a function that will convert
--- 'T.Chunk' to 'ByteString' in the most colorful way possible.
-byteStringMakerFromTerminal
+-- | Spawns a subprocess to read the output of @tput colors@.  If this
+-- says there are at least 256 colors are available, returns
+-- 'toByteStringsColors256'.  Otherwise, if there are at least 8
+-- colors available, returns 'toByteStringsColors8'.  Otherwise,
+-- returns 'toByteStringsColors0'.
+--
+-- If any IO exceptions arise during this process, they are discarded
+-- and 'toByteStringsColors0' is returned.
+byteStringMakerFromEnvironment
   :: IO (T.Chunk -> [ByteString] -> [ByteString])
-byteStringMakerFromTerminal
-  = fmap f $ readProcessWithExitCode "tput" ["colors"] ""
+byteStringMakerFromEnvironment
+  = catcher (fmap f $ readProcessWithExitCode "tput" ["colors"] "")
   where
     f (code, stdOut, _) = maybe toByteStringsColors0 id $ do
       case code of
         ExitFailure _ -> mzero
         _ -> return ()
-      numColors <- readMaybe . filter (`elem` "0123456789") $ stdOut
+      numColors <- readMaybe stdOut
       return $ numColorsToFunc numColors
     numColorsToFunc i
       | i >= (256 :: Int) = toByteStringsColors256
       | i >= 8 = toByteStringsColors8
       | otherwise = toByteStringsColors0
 
+    catcher act = fmap g (try act)
+      where
+        g (Left e) = toByteStringsColors0
+          where _types = e :: IOException
+        g (Right good) = good
+          
 
 -- | Convert a list of 'T.Chunk' to a list of 'ByteString'.  The
 -- length of the returned list may be longer than the length of the
@@ -260,3 +274,25 @@ chunksToByteStrings
   -> [ByteString]
 chunksToByteStrings mk = ($ []) . foldr (.) id . map mk
 
+-- Quick and dirty I/O functions
+
+-- | Writes a 'Chunk' to standard output.  Spawns a child process to
+-- read the output of @tput colors@ to determine how many colors to
+-- use, for every single chunk.  Therefore, this is not going to win
+-- any speed awards.  You are better off using 'chunksToByteStrings'
+-- and the functions in "Data.ByteString" to print your 'Chunk's if
+-- you are printing a lot of them.
+putChunk :: T.Chunk -> IO ()
+putChunk ck = do
+  mkr <- byteStringMakerFromEnvironment
+  mapM_ BS.putStr . chunksToByteStrings mkr $ [ck]
+
+-- | Writes a 'Chunk' to standard output, and appends a newline.
+-- Spawns a child process to read the output of @tput colors@ to
+-- determine how many colors to use, for every single chunk.
+-- Therefore, this is not going to win any speed awards.  You are
+-- better off using 'chunksToByteStrings' and the functions in
+-- "Data.ByteString" to print your 'Chunk's if you are printing a lot
+-- of them.
+putChunkLn :: T.Chunk -> IO ()
+putChunkLn ck = putChunk ck >> putStrLn ""

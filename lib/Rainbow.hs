@@ -196,13 +196,8 @@ module Rainbow
 
   -- * Converting 'Chunk' to 'Data.ByteString.ByteString'
 
-  -- | To print a 'Chunk', you need to convert it to a
-  -- 'Data.ByteString.ByteString'.  These functions assume your
-  -- terminal consistent with is ECMA 48 / ISO 6429; this includes
-  -- nearly every major terminal, such as xterm, the Mac OS X
-  -- terminal, the Linux console, and so on.  It does not include some
-  -- environments such as an Emacs shell buffer; for those
-  -- environments, use 'toByteStringsColors0'.
+  -- | To print a 'Chunk', you need to convert it to some
+  -- 'Data.ByteString.ByteString's.
   --
   -- All these functions convert the 'Data.Text' to UTF-8
   -- 'Data.ByteString.ByteString's.  Many of these functions return a
@@ -210,11 +205,19 @@ module Rainbow
   -- explanation of difference lists:
   --
   -- http://learnyouahaskell.com/for-a-few-monads-more
-  , byteStringMakerFromTerminal
+  , byteStringMakerFromEnvironment
   , toByteStringsColors0
   , toByteStringsColors8
   , toByteStringsColors256
   , chunksToByteStrings
+
+  -- * Quick and dirty functions for IO
+
+  -- | For efficiency reasons you probably don't want to use these
+  -- when printing large numbers of 'Chunk', but they are handy for
+  -- throwaway uses like experimenting in GHCi.
+  , putChunk
+  , putChunkLn
 
   -- * Re-exports
   -- $reexports
@@ -225,16 +228,21 @@ module Rainbow
   , module Data.ByteString
   , module Data.Text
 
+  -- * Notes on terminals
+  -- $termNotes
+
   ) where
 
 import Rainbow.Types
 import Rainbow.Colors
 import Rainbow.Translate
-  ( byteStringMakerFromTerminal
+  ( byteStringMakerFromEnvironment
   , toByteStringsColors0
   , toByteStringsColors8
   , toByteStringsColors256
   , chunksToByteStrings
+  , putChunk
+  , putChunkLn
   )
 import Data.Monoid ((<>), mempty)
 import Data.Text (Text)
@@ -247,4 +255,61 @@ import Data.ByteString (ByteString)
    * "Data.ByteString" re-exports 'ByteString'
 
    * "Data.Text" re-exports 'Text'
+-}
+
+{- $termNotes
+
+Earlier versions of Rainbow used the Haskell terminfo library for
+dealing with the terminal.  Terminfo is available at
+
+<https://hackage.haskell.org/package/terminfo>
+
+Terminfo, in turn, uses the UNIX terminfo library.  The biggest
+advantage of using Terminfo is that it is compatible with a huge
+variety of terminals.  Many of these terminals are hardware models
+that are gathering dust in an IBM warehouse somewhere, but even modern
+software terminals might have quirks.  Terminfo covers all those.
+
+The disadvantage is that using Terminfo requires you to perform IO
+whenever you need to format output for the terminal.  Your only choice
+when using Terminfo is to send output directly to the terminal, or to
+a handle.  This goes against typical Haskell practice, where we try to
+write pure code whenever possible.
+
+Perhaps surprisingly, there are times where you may want to format
+output, but not immediately send it to the terminal.  Maybe you want
+to send it to a file instead, or maybe you want to use a Haskell
+library like Pipes and stream it somewhere.  Terminfo is a binding to
+a Unix library that is not designed for this sort of thing.  The
+closest you could get using Terminfo would be to make a Handle that is
+backed by a in-memory buffer.  There is a package for that sort of
+thing:
+
+<http://hackage.haskell.org/package/knob>
+
+but it seems like a nasty workaround.  Or you can hijack stdout and
+send that somewhere--again, nasty workaround.
+
+So I decided to stop using Terminfo.  That means Rainbow no longer
+supports a menagerie of bizarre terminals.  It instead just uses the
+standard ISO 6429 / ECMA 48 terminal codes.  These are the same codes
+that are used by xterm, the OS X Terminal, the Linux console, or any
+other reasonably modern software terminal.  Realistically they are the
+only terminals Rainbow would be used for.
+
+Probably the most common so-called terminals in use today that do NOT
+support the ISO 6429 codes are those that are not really terminals.
+For instance, you might use an Emacs shell buffer.  For those
+situations just use 'toByteStringsColors0'.
+
+I also decided to standardize on UTF-8 for the 'Text' output..  These
+days that seems reasonable.
+
+Now, to figure out how many colors the terminal supports, Rainbow
+simply uses the @tput@ program.  This removes the dependency on
+Terminfo altogether.
+
+Apparently it's difficult to get ISO 6429 support on Microsoft
+Windows.  Oh well.
+
 -}
