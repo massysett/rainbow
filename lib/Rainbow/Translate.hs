@@ -17,6 +17,7 @@ import Text.Read
 import System.Exit
 import Control.Monad
 import Control.Exception
+import qualified System.IO as IO
 
 single :: Char -> [ByteString] -> [ByteString]
 single c = ((BS8.singleton c):)
@@ -261,6 +262,18 @@ byteStringMakerFromEnvironment
         g (Left e) = toByteStringsColors0
           where _types = e :: IOException
         g (Right good) = good
+
+-- | Like 'byteStringMakerFromEnvironment' but also consults a
+-- provided 'Handle'.  If the 'Handle' is not a terminal,
+-- 'toByteStringsColors0' is returned.  Otherwise, the value of
+-- 'byteStringMakerFromEnvironment' is returned.
+byteStringMakerFromHandle
+  :: IO.Handle
+  -> IO (T.Chunk -> [ByteString] -> [ByteString])
+byteStringMakerFromHandle h = IO.hIsTerminalDevice h >>= f
+  where
+    f isTerm | isTerm = byteStringMakerFromEnvironment
+             | otherwise = return toByteStringsColors0
           
 
 -- | Convert a list of 'T.Chunk' to a list of 'ByteString'.  The

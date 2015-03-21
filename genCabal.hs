@@ -19,7 +19,7 @@ bytestring :: Package
 bytestring = closedOpen "bytestring" [0,10] [0,11]
 
 quickCheck :: Package
-quickCheck = closedOpen "QuickCheck" [2,7] [2,8]
+quickCheck = closedOpen "QuickCheck" [2,8] [2,9]
 
 process :: Package
 process = closedOpen "process" [1,2] [1,3]

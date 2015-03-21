@@ -213,6 +213,7 @@ module Rainbow
   -- 'toByteStringsColors8', or 'toByteStringsColors256' as the first
   -- argument.  'chunksToByteStrings' has an example.
   , byteStringMakerFromEnvironment
+  , byteStringMakerFromHandle
   , toByteStringsColors0
   , toByteStringsColors8
   , toByteStringsColors256
@@ -245,6 +246,7 @@ import Rainbow.Types
 import Rainbow.Colors
 import Rainbow.Translate
   ( byteStringMakerFromEnvironment
+  , byteStringMakerFromHandle
   , toByteStringsColors0
   , toByteStringsColors8
   , toByteStringsColors256
