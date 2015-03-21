@@ -43,27 +43,29 @@ normalDefault = sgrSingle 0
 bold :: [ByteString] -> [ByteString]
 bold = sgrSingle 1
 
-underlined :: [ByteString] -> [ByteString]
-underlined = sgrSingle 4
+faint :: [ByteString] -> [ByteString]
+faint = sgrSingle 2
 
-flash :: [ByteString] -> [ByteString]
-flash = sgrSingle 5
+italic :: [ByteString] -> [ByteString]
+italic = sgrSingle 3
 
--- Yes, flash is 5, inverse is 7; 6 is apparently skipped
+underline :: [ByteString] -> [ByteString]
+underline = sgrSingle 4
+
+blink :: [ByteString] -> [ByteString]
+blink = sgrSingle 5
+
+-- Yes, blink is 5, inverse is 7; 6 is skipped.  In ISO 6429 6 blinks
+-- at a different rate.
+
 inverse :: [ByteString] -> [ByteString]
 inverse = sgrSingle 7
 
-boldOff :: [ByteString] -> [ByteString]
-boldOff = sgrDouble 2 2
+invisible :: [ByteString] -> [ByteString]
+invisible = sgrSingle 8
 
-underlineOff :: [ByteString] -> [ByteString]
-underlineOff = sgrDouble 2 4
-
-flashOff :: [ByteString] -> [ByteString]
-flashOff = sgrDouble 2 5
-
-inverseOff :: [ByteString] -> [ByteString]
-inverseOff = sgrDouble 2 7
+strikeout :: [ByteString] -> [ByteString]
+strikeout = sgrSingle 9
 
 foreBlack :: [ByteString] -> [ByteString]
 foreBlack = sgrDouble 3 0
@@ -166,13 +168,17 @@ backColor256 (Color256 mayW8) = case mayW8 of
   Just w8 -> back256 w8
 
 styleCommon :: StyleCommon -> [ByteString] -> [ByteString]
-styleCommon (StyleCommon b u f i)
-  = effect bold boldOff b
-  . effect underlined underlineOff u
-  . effect flash flashOff f
-  . effect inverse inverseOff i
+styleCommon (StyleCommon bld fnt ita und bli ivr isb stk)
+  = effect bold bld
+  . effect faint fnt
+  . effect italic ita
+  . effect underline und
+  . effect blink bli
+  . effect inverse ivr
+  . effect invisible isb
+  . effect strikeout stk
   where
-    effect on off = maybe id (\x -> if x then on else off)
+    effect on = maybe id (\x -> if x then on else id)
       . getLast
 
 style8 :: Style8 -> [ByteString] -> [ByteString]

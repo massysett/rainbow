@@ -13,6 +13,7 @@
 
 module Rainbow.QuickCheck where
 
+import Control.Applicative
 import Test.QuickCheck
 import Rainbow.Colors
 import Rainbow.Types
@@ -37,7 +38,7 @@ instance Arbitrary (Last Color256) where
 
 instance Arbitrary StyleCommon where
   arbitrary
-    = liftM4 StyleCommon g g g g
+    = StyleCommon <$> g <*> g <*> g <*> g <*> g <*> g <*> g <*> g
     where
       g = fmap Last arbitrary
 

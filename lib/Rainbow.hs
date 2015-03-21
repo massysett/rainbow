@@ -105,9 +105,13 @@ module Rainbow
   -- @
 
   , bold
+  , faint
+  , italic
   , underline
-  , flash
+  , blink
   , inverse
+  , invisible
+  , strikeout
 
   -- * Effects for 8-color terminals only
 
@@ -118,9 +122,13 @@ module Rainbow
   -- @
 
   , bold8
+  , faint8
+  , italic8
   , underline8
-  , flash8
+  , blink8
   , inverse8
+  , invisible8
+  , strikeout8
 
   -- * Effects for 256-color terminals only
 
@@ -133,9 +141,13 @@ module Rainbow
   -- @
 
   , bold256
+  , faint256
+  , italic256
   , underline256
-  , flash256
+  , blink256
   , inverse256
+  , invisible256
+  , strikeout256
 
   -- * Colors
 
