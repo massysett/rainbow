@@ -12,9 +12,6 @@ rainbowVersion = [0,20,4,0]
 base :: Package
 base = closedOpen "base" [4,5,0,0] [4,8,0,0]
 
-terminfo :: Package
-terminfo = closedOpen "terminfo" [0,3,2] [0,5,0,0]
-
 text :: Package
 text = closedOpen "text" [0,11,2,0] [1,3,0,0]
 
@@ -24,11 +21,14 @@ bytestring = closedOpen "bytestring" [0,10] [0,11]
 quickCheck :: Package
 quickCheck = closedOpen "QuickCheck" [2,7] [2,8]
 
+process :: Package
+process = closedOpen "process" [1,2] [1,3]
+
 commonOptions :: HasBuildInfo a => [a]
 commonOptions =
   [ haskell2010
   , ghcOptions ["-Wall"]
-  , buildDepends [base, terminfo, text, bytestring]
+  , buildDepends [base, text, bytestring, process]
   , hsSourceDirs ["lib"]
   ]
 
@@ -53,12 +53,6 @@ properties = blank
     , "such as bold, underlining, etc. You pair each Text with a description"
     , "of how it should appear. Rainbow works with both 8-color and 256-color"
     , "terminals."
-    , ""
-    , "rainbow uses the terminfo package which, in turn, needs the full C"
-    , "library for ncurses installed, including the development"
-    , "headers. Before installing terminfo, you may need to install the"
-    , "ncurses headers (for instance, on Debian systems, install the"
-    , "libncurses5-dev package.)"
     ]
   , testedWith = map (\ls -> (ghc, eq ls)) [[7,6,3], [7,8,2]]
   }

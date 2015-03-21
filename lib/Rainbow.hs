@@ -91,37 +91,10 @@
 module Rainbow
   (
 
-  -- * Terminal definitions
-    Term(..)
-  , termFromEnv
-  , smartTermFromEnv
-
   -- * Chunks
-  , Chunk(..)
+    Chunk(..)
   , fromText
   , fromLazyText
-
-  -- * Printing chunks
-  , putChunks
-  , hPutChunks
-
-  -- ** Printing one chunk at a time
-
-  -- | These functions make it easy to print one chunk at a time. Each
-  -- function initializes the terminal once for each chunk, unlike the
-  -- list-oriented functions, which only initialize the terminal
-  -- once. (Initialization does not clear the screen; rather, it is a
-  -- process that the terminfo library requires.) Thus there might be
-  -- a performance penalty for using these functions to print large
-  -- numbers of chunks. Or, there might not be--I have not benchmarked
-  -- them.
-  --
-  -- These functions use the default terminal, obtained using
-  -- 'termFromEnv'.
-  , putChunk
-  , putChunkLn
-  , hPutChunk
-  , hPutChunkLn
 
   -- * Effects for both 8 and 256 color terminals
 
@@ -209,7 +182,41 @@ module Rainbow
   , brightWhite
   , to256
 
+  -- * Converting 'Chunk' to 'Data.ByteString.ByteString'
+
+  -- | To print a 'Chunk', you need to convert it to a
+  -- 'Data.ByteString.ByteString'.  These functions assume your
+  -- terminal consistent with is ECMA 48 / ISO 6429; this includes
+  -- nearly every major terminal, such as xterm, the Mac OS X
+  -- terminal, the Linux console, and so on.  It does not include some
+  -- environments such as an Emacs shell buffer; for those
+  -- environments, use 'toByteStringsColors0'.
+  --
+  -- All these functions convert the 'Data.Text' to UTF-8
+  -- 'Data.ByteString.ByteString's.  Many of these functions return a
+  -- difference list.  Learn You a Haskell for Great Good has a great
+  -- explanation of difference lists:
+  --
+  -- http://learnyouahaskell.com/for-a-few-monads-more
+  , byteStringMakerFromTerminal
+  , toByteStringsColors0
+  , toByteStringsColors8
+  , toByteStringsColors256
+  , chunksToByteStrings
+
+  -- * Re-exports
+  -- | "Data.Monoid" re-exports '<>'
+  , module Data.Monoid
+
   ) where
 
 import Rainbow.Types
 import Rainbow.Colors
+import Rainbow.Translate
+  ( byteStringMakerFromTerminal
+  , toByteStringsColors0
+  , toByteStringsColors8
+  , toByteStringsColors256
+  , chunksToByteStrings
+  )
+import Data.Monoid ((<>))

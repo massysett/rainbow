@@ -11,124 +11,125 @@ import Rainbow.Types
     StyleCommon(..), Style8(..), Style256(..), TextSpec)
 import qualified Rainbow.Types as T
 import Data.Text.Encoding
-import qualified System.Console.Terminfo as Ti
+import System.Process
+import Text.Read
+import System.Exit
+import Control.Monad
 
-type BsS = [ByteString] -> [ByteString]
-
-single :: Char -> BsS
+single :: Char -> [ByteString] -> [ByteString]
 single c = ((BS8.singleton c):)
 
-escape :: BsS
+escape :: [ByteString] -> [ByteString]
 escape = single '\x1B'
 
-csi :: BsS
+csi :: [ByteString] -> [ByteString]
 csi = escape . single '['
 
-sgr :: BsS -> BsS
+sgr :: ([ByteString] -> [ByteString]) -> [ByteString] -> [ByteString]
 sgr sq = csi . sq . single 'm'
 
-params :: Show a => [a] -> BsS
+params :: Show a => [a] -> [ByteString] -> [ByteString]
 params cs = ((intersperse ";" . map (BS8.pack . show) $ cs) ++)
 
-sgrSingle :: Word -> BsS
+sgrSingle :: Word -> [ByteString] -> [ByteString]
 sgrSingle w = sgr $ params [w]
 
-sgrDouble :: Word -> Word -> BsS
+sgrDouble :: Word -> Word -> [ByteString] -> [ByteString]
 sgrDouble x y = sgr $ params [x, y]
 
-normalDefault :: BsS
+normalDefault :: [ByteString] -> [ByteString]
 normalDefault = sgrSingle 0
 
-bold :: BsS
+bold :: [ByteString] -> [ByteString]
 bold = sgrSingle 1
 
-underlined :: BsS
+underlined :: [ByteString] -> [ByteString]
 underlined = sgrSingle 4
 
-flash :: BsS
+flash :: [ByteString] -> [ByteString]
 flash = sgrSingle 5
 
 -- Yes, flash is 5, inverse is 7; 6 is apparently skipped
-inverse :: BsS
+inverse :: [ByteString] -> [ByteString]
 inverse = sgrSingle 7
 
-boldOff :: BsS
+boldOff :: [ByteString] -> [ByteString]
 boldOff = sgrDouble 2 2
 
-underlineOff :: BsS
+underlineOff :: [ByteString] -> [ByteString]
 underlineOff = sgrDouble 2 4
 
-flashOff :: BsS
+flashOff :: [ByteString] -> [ByteString]
 flashOff = sgrDouble 2 5
 
-inverseOff :: BsS
+inverseOff :: [ByteString] -> [ByteString]
 inverseOff = sgrDouble 2 7
 
-foreBlack :: BsS
+foreBlack :: [ByteString] -> [ByteString]
 foreBlack = sgrDouble 3 0
 
-foreRed :: BsS
+foreRed :: [ByteString] -> [ByteString]
 foreRed = sgrDouble 3 1
 
-foreGreen :: BsS
+foreGreen :: [ByteString] -> [ByteString]
 foreGreen = sgrDouble 3 2
 
-foreYellow :: BsS
+foreYellow :: [ByteString] -> [ByteString]
 foreYellow = sgrDouble 3 3
 
-foreBlue :: BsS
+foreBlue :: [ByteString] -> [ByteString]
 foreBlue = sgrDouble 3 4
 
-foreMagenta :: BsS
+foreMagenta :: [ByteString] -> [ByteString]
 foreMagenta = sgrDouble 3 5
 
-foreCyan :: BsS
+foreCyan :: [ByteString] -> [ByteString]
 foreCyan = sgrDouble 3 6
 
-foreWhite :: BsS
+foreWhite :: [ByteString] -> [ByteString]
 foreWhite = sgrDouble 3 7
 
 -- code 3 8 is skipped
 
-foreDefault :: BsS
+foreDefault :: [ByteString] -> [ByteString]
 foreDefault = sgrDouble 3 9
 
-backBlack :: BsS
+backBlack :: [ByteString] -> [ByteString]
 backBlack = sgrDouble 4 0
 
-backRed :: BsS
+backRed :: [ByteString] -> [ByteString]
 backRed = sgrDouble 4 1
 
-backGreen :: BsS
+backGreen :: [ByteString] -> [ByteString]
 backGreen = sgrDouble 4 2
 
-backYellow :: BsS
+backYellow :: [ByteString] -> [ByteString]
 backYellow = sgrDouble 4 3
 
-backBlue :: BsS
+backBlue :: [ByteString] -> [ByteString]
 backBlue = sgrDouble 4 4
 
-backMagenta :: BsS
+backMagenta :: [ByteString] -> [ByteString]
 backMagenta = sgrDouble 4 5
 
-backCyan :: BsS
+backCyan :: [ByteString] -> [ByteString]
 backCyan = sgrDouble 4 6
 
-backWhite :: BsS
+backWhite :: [ByteString] -> [ByteString]
 backWhite = sgrDouble 4 7
 
 -- code 4 8 is skipped
 
-backDefault :: BsS
+backDefault :: [ByteString] -> [ByteString]
 backDefault = sgrDouble 4 9
 
-fore256 :: Word8 -> BsS
+fore256 :: Word8 -> [ByteString] -> [ByteString]
 fore256 c = sgr $ params [38,5,c]
 
-back256 :: Word8 -> BsS
+back256 :: Word8 -> [ByteString] -> [ByteString]
 back256 c = sgr $ params [48,5,c]
 
-foreColor8 :: Color8 -> BsS
+foreColor8 :: Color8 -> [ByteString] -> [ByteString]
 foreColor8 (Color8 maym8) = case maym8 of
   Nothing -> id
   Just m8 -> case m8 of
@@ -141,7 +142,7 @@ foreColor8 (Color8 maym8) = case maym8 of
     E6 -> foreCyan
     E7 -> foreWhite
 
-backColor8 :: Color8 -> BsS
+backColor8 :: Color8 -> [ByteString] -> [ByteString]
 backColor8 (Color8 maym8) = case maym8 of
   Nothing -> id
   Just m8 -> case m8 of
@@ -154,17 +155,17 @@ backColor8 (Color8 maym8) = case maym8 of
     E6 -> backCyan
     E7 -> backWhite
 
-foreColor256 :: Color256 -> BsS
+foreColor256 :: Color256 -> [ByteString] -> [ByteString]
 foreColor256 (Color256 mayW8) = case mayW8 of
   Nothing -> id
   Just w8 -> fore256 w8
 
-backColor256 :: Color256 -> BsS
+backColor256 :: Color256 -> [ByteString] -> [ByteString]
 backColor256 (Color256 mayW8) = case mayW8 of
   Nothing -> id
   Just w8 -> back256 w8
 
-styleCommon :: StyleCommon -> BsS
+styleCommon :: StyleCommon -> [ByteString] -> [ByteString]
 styleCommon (StyleCommon b u f i)
   = effect bold boldOff b
   . effect underlined underlineOff u
@@ -174,7 +175,7 @@ styleCommon (StyleCommon b u f i)
     effect on off = maybe id (\x -> if x then on else off)
       . getLast
 
-style8 :: Style8 -> BsS
+style8 :: Style8 -> [ByteString] -> [ByteString]
 style8 (Style8 f8 b8 sc)
   = effect foreColor8 f8
   . effect backColor8 b8
@@ -182,7 +183,7 @@ style8 (Style8 f8 b8 sc)
   where
     effect on = maybe id on . getLast
 
-style256 :: Style256 -> BsS
+style256 :: Style256 -> [ByteString] -> [ByteString]
 style256 (Style256 f256 b256 sc)
   = effect foreColor256 f256
   . effect backColor256 b256
@@ -190,22 +191,31 @@ style256 (Style256 f256 b256 sc)
   where
     effect on = maybe id on . getLast
 
-textSpec8 :: TextSpec -> BsS
+textSpec8 :: TextSpec -> [ByteString] -> [ByteString]
 textSpec8 = style8 . T.style8
 
-textSpec256 :: TextSpec -> BsS
+textSpec256 :: TextSpec -> [ByteString] -> [ByteString]
 textSpec256 = style256 . T.style256
 
-toByteStringsColors0 :: T.Chunk -> BsS
+-- | Convert a 'T.Chunk' to a list of 'ByteString'; do not show any
+-- colors.  When applied to a 'T.Chunk', this function returns a
+-- difference list.
+toByteStringsColors0 :: T.Chunk -> [ByteString] -> [ByteString]
 toByteStringsColors0 c = ((map encodeUtf8 . T.text $ c) ++)
 
-toByteStringsColors8 :: T.Chunk -> BsS
+-- | Convert a 'T.Chunk' to a list of 'ByteString'; show eight
+-- colors.  When applied to a 'T.Chunk', this function returns a
+-- difference list.
+toByteStringsColors8 :: T.Chunk -> [ByteString] -> [ByteString]
 toByteStringsColors8 c
   = normalDefault
   . textSpec8 (T.textSpec c)
   . ((map encodeUtf8 . T.text $ c) ++)
 
-toByteStringsColors256 :: T.Chunk -> BsS
+-- | Convert a 'T.Chunk' to a list of 'ByteString'; show 256
+-- colors.  When applied to a 'T.Chunk', this function returns a
+-- difference list.
+toByteStringsColors256 :: T.Chunk -> [ByteString] -> [ByteString]
 toByteStringsColors256 c
   = normalDefault
   . textSpec256 (T.textSpec c)
@@ -216,14 +226,20 @@ toByteStringsColors256 c
 -- 'T.Chunk' to 'ByteString' in the most colorful way possible.
 byteStringMakerFromTerminal
   :: IO (T.Chunk -> [ByteString] -> [ByteString])
-byteStringMakerFromTerminal = fmap f Ti.setupTermFromEnv
+byteStringMakerFromTerminal
+  = fmap f $ readProcessWithExitCode "tput" ["colors"] ""
   where
-    f term = case Ti.getCapability term Ti.termColors of
-      Nothing -> toByteStringsColors0
-      Just cols
-        | cols >= 256 -> toByteStringsColors256
-        | cols >= 8 -> toByteStringsColors8
-        | otherwise -> toByteStringsColors0
+    f (code, stdOut, _) = maybe toByteStringsColors0 id $ do
+      case code of
+        ExitFailure _ -> mzero
+        _ -> return ()
+      numColors <- readMaybe . filter (`elem` "0123456789") $ stdOut
+      return $ numColorsToFunc numColors
+    numColorsToFunc i
+      | i >= (256 :: Int) = toByteStringsColors256
+      | i >= 8 = toByteStringsColors8
+      | otherwise = toByteStringsColors0
+
 
 -- | Convert a list of 'T.Chunk' to a list of 'ByteString'.  The
 -- length of the returned list may be longer than the length of the
@@ -235,3 +251,4 @@ chunksToByteStrings
   -> [T.Chunk]
   -> [ByteString]
 chunksToByteStrings mk = ($ []) . foldr (.) id . map mk
+

@@ -9,55 +9,9 @@ module Rainbow.Types where
 import qualified Data.String as Str
 import Data.Monoid
 import Data.Text (Text)
-import Data.Maybe (fromMaybe)
 import qualified Data.Text as X
 import qualified Data.Text.Lazy as XL
-import qualified System.Console.Terminfo as T
-import System.IO as IO
-import System.Environment as Env
 import Data.Word (Word8)
-
---
--- Terminal definitions
---
-
--- | Which terminal definition to use.
-data Term
-  = Dumb
-  -- ^ Using this terminal should always succeed. This suppresses all
-  -- colors. Uesful if output is not going to a TTY, or if you just do
-  -- not like colors.
-
-  | TermName String
-  -- ^ Use the terminal with this given name. You might get this from
-  -- the TERM environment variable, or set it explicitly. A runtime
-  -- error will result if the terminfo database does not have a
-  -- definition for this terminal. If this terminal supports 256
-  -- colors, then 256 colors are used. If this terminal supports less
-  -- than 256 colors, but at least 8 colors, then 8 colors are
-  -- used. Otherwise, no colors are used.
-  deriving (Eq, Show)
-
--- | Gets the terminal definition from the environment. If the
--- environment does not have a TERM veriable, use 'Dumb'.
-termFromEnv :: IO Term
-termFromEnv = do
-  t <- fmap (lookup "TERM") Env.getEnvironment
-  return $ maybe Dumb TermName t
-
--- | Gets the terminal definition from the environment and a handle.
--- If the handle is not a terminal, 'Dumb' is returned.  Otherwise,
--- the terminal is obtained from the environment.
-smartTermFromEnv
-  :: IO.Handle
-  -- ^ Check this handle to see if it is a terminal (typically you
-  -- will use stdout).
-
-  -> IO Term
-smartTermFromEnv h = IO.hIsTerminalDevice h >>= f
-  where
-    f isTerm | isTerm = termFromEnv
-             | otherwise = return Dumb
 
 -- For Background8, Background256, Foreground8, Foreground256: the
 -- Last wraps a Maybe (Terminfo Color). If the inner Maybe is Nothing,
@@ -104,10 +58,6 @@ newtype Color8 = Color8
   -- otherwise, use the corresponding Terminfo 'T.Color'.
   } deriving (Eq, Ord, Show)
 
-color8toTerminfo :: Color8 -> Maybe T.Color
-color8toTerminfo = fmap (T.ColorNumber . fromIntegral . enum8toWord8)
-  . unColor8
-
 -- | Color for an 256-color terminal.  Does not affect 8-color
 -- terminals.
 
@@ -116,10 +66,6 @@ newtype Color256 = Color256
   -- ^ Nothing indicates to use the default color for the terminal;
   -- otherwise, use the corresponding Terminfo 'T.Color'.
   } deriving (Eq, Ord, Show)
-
-color256toTerminfo :: Color256 -> Maybe T.Color
-color256toTerminfo = fmap (T.ColorNumber . fromIntegral)
-  . unColor256
 
 -- | Any color for an 8-color terminal can also be used in a
 -- 256-color terminal.
@@ -228,120 +174,6 @@ instance Monoid Chunk where
   mempty = Chunk mempty mempty
   mappend (Chunk s1 t1) (Chunk s2 t2) = Chunk (s1 <> s2) (t1 <> t2)
 
-
-defaultColors :: T.Terminal -> T.TermOutput
-defaultColors term =
-  fromMaybe mempty (T.getCapability term T.restoreDefaultColors)
-
-
-commonAttrs :: T.Terminal -> StyleCommon -> T.TermOutput
-commonAttrs t s =
-  let a = T.Attributes
-        { T.standoutAttr = False
-        , T.underlineAttr = fromMaybe False
-          . getLast . scUnderline $ s
-        , T.reverseAttr = fromMaybe False
-          . getLast . scInverse $ s
-        , T.blinkAttr = fromMaybe False
-          . getLast . scFlash $ s
-        , T.dimAttr = False
-        , T.boldAttr = fromMaybe False
-          . getLast . scBold $ s
-        , T.invisibleAttr = False
-        , T.protectedAttr = False
-        }
-  in case T.getCapability t (T.setAttributes) of
-      Nothing -> error $ "Rainbow: commonAttrs: "
-                 ++ "capability failed; should never happen"
-      Just f -> f a
-
-
--- | Gets the right set of terminal codes to apply the desired
--- highlighting, bold, underlining, etc. Be sure to apply the
--- attributes first (bold, underlining, etc) and then the
--- colors. Setting the colors first and then the attributes seems to
--- reset the colors, giving blank output.
-getTermCodes
-  :: T.Terminal
-  -> TextSpec
-  -> T.TermOutput
-getTermCodes t ts = fromMaybe mempty $ do
-  cols <- T.getCapability t T.termColors
-  let TextSpec s8 s256 = ts
-      Style8 f8 b8 c8 = s8
-      Style256 f256 b256 c256 = s256
-  setFg <- T.getCapability t T.setForegroundColor
-  setBg <- T.getCapability t T.setBackgroundColor
-  (fg, bg, cm) <- case () of
-    _ | cols >= 256 -> Just $ ( fmap color256toTerminfo $ getLast f256
-                              , fmap color256toTerminfo $ getLast b256
-                              , c256)
-      | cols >= 8 -> Just ( fmap color8toTerminfo $ getLast f8
-                          , fmap color8toTerminfo $ getLast b8
-                          , c8)
-      | otherwise -> Nothing
-  let oFg = maybe mempty (maybe mempty setFg) fg
-      oBg = maybe mempty (maybe mempty setBg) bg
-      oCm = commonAttrs t cm
-  return $ mconcat [oCm, oFg, oBg]
-
-
-hPrintChunk :: IO.Handle -> T.Terminal -> Chunk -> IO ()
-hPrintChunk h t (Chunk ts xs) =
-  T.hRunTermOutput h t
-  . mconcat
-  $ defaultColors t : codes : (map (T.termText . X.unpack) $ xs)
-  where
-    codes = getTermCodes t ts
-
--- | Sends a list of chunks to the given handle for printing. Sets up
--- the terminal (this only needs to be done once.)  See 'putChunks'
--- for notes on how many colors are used.
-hPutChunks :: IO.Handle -> Term -> [Chunk] -> IO ()
-hPutChunks h t cs = do
-  let setup = case t of
-        Dumb -> T.setupTerm "dumb"
-        TermName s -> T.setupTerm s
-  term <- setup
-  mapM_ (hPrintChunk h term) cs
-  T.hRunTermOutput h term (defaultColors term)
-  T.hRunTermOutput h term
-    $ case T.getCapability term T.allAttributesOff of
-        Nothing -> error $ "Rainbow.putChunks: error: "
-                   ++ "allAttributesOff failed"
-        Just s -> s
-
--- | Sends a list of chunks to standard output for printing. Sets up
--- the terminal (this only needs to be done once.)
---
--- Which colors are used depends upon the 'Term'. If it is 'Dumb',
--- then no colors are used on output. If the 'Term' is specified with
--- 'TermName', the UNIX terminfo library is used to determine how many
--- colors the terminal supports. If it supports at least 256 colors,
--- then 256 colors are used. If it supports at least 8 colors but less
--- than 256 colors, then 8 colors are used. Otherwise, no colors are
--- used. A runtime error will occur if the 'TermName' is not found in
--- the system terminal database.
-putChunks :: Term -> [Chunk] -> IO ()
-putChunks = hPutChunks IO.stdout
-
--- | Print one chunk at a time, to a handle
-hPutChunk :: IO.Handle -> Chunk -> IO ()
-hPutChunk h c = do
-  t <- termFromEnv
-  hPutChunks h t [c]
-
--- | Print one chunk at a time, to standard output
-putChunk :: Chunk -> IO ()
-putChunk = hPutChunk IO.stdout
-
--- | Print one chunk at a time, to a handle, append a newline
-hPutChunkLn :: IO.Handle -> Chunk -> IO ()
-hPutChunkLn h c = hPutChunk h c >> IO.hPutStr h "\n"
-
--- | Print one chunk at a time, to standard output, append a newline
-putChunkLn :: Chunk -> IO ()
-putChunkLn c = putChunk c >> putStr "\n"
 
 bold8 :: Chunk
 bold8 = x {
