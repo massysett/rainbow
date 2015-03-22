@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, DeriveDataTypeable #-}
 
 -- | The innards of Rainbow.  Ordinarily you should not need this
 -- module; instead, just import "Rainbow", which
@@ -15,6 +15,7 @@ import qualified Data.Text as X
 import qualified Data.Text.Lazy as XL
 import Data.Word (Word8)
 import GHC.Generics
+import Data.Typeable
 
 -- For Background8, Background256, Foreground8, Foreground256: the
 -- Last wraps a Maybe (Terminfo Color). If the inner Maybe is Nothing,
@@ -39,7 +40,7 @@ data Enum8
   | E5
   | E6
   | E7
-  deriving (Eq, Ord, Show, Bounded, Enum, Generic)
+  deriving (Eq, Ord, Show, Bounded, Enum, Generic, Typeable)
 
 enum8toWord8 :: Enum8 -> Word8
 enum8toWord8 e = case e of
@@ -59,7 +60,7 @@ newtype Color8 = Color8
   { unColor8 :: Maybe Enum8
   -- ^ Nothing indicates to use the default color for the terminal;
   -- otherwise, use the corresponding Terminfo 'T.Color'.
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, Typeable)
 
 -- | Color for an 256-color terminal.  Does not affect 8-color
 -- terminals.
@@ -68,7 +69,7 @@ newtype Color256 = Color256
   { unColor256 :: Maybe Word8
   -- ^ Nothing indicates to use the default color for the terminal;
   -- otherwise, use the corresponding Terminfo 'T.Color'.
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, Typeable)
 
 -- | Any color for an 8-color terminal can also be used in a
 -- 256-color terminal.
@@ -92,7 +93,7 @@ data StyleCommon = StyleCommon
   , scInverse :: Last Bool
   , scInvisible :: Last Bool
   , scStrikeout :: Last Bool
-  } deriving (Show, Eq, Ord, Generic)
+  } deriving (Show, Eq, Ord, Generic, Typeable)
 
 
 instance Monoid StyleCommon where
@@ -111,7 +112,7 @@ data Style8 = Style8
   { foreground8 :: Foreground8
   , background8 :: Background8
   , common8 :: StyleCommon
-  } deriving (Show, Eq, Ord, Generic)
+  } deriving (Show, Eq, Ord, Generic, Typeable)
 
 
 instance Monoid Style8 where
@@ -125,7 +126,7 @@ data Style256 = Style256
   { foreground256 :: Foreground256
   , background256 :: Background256
   , common256 :: StyleCommon
-  } deriving (Show, Eq, Ord, Generic)
+  } deriving (Show, Eq, Ord, Generic, Typeable)
 
 
 instance Monoid Style256 where
@@ -142,7 +143,7 @@ instance Monoid Style256 where
 data TextSpec = TextSpec
   { style8 :: Style8
   , style256 :: Style256
-  } deriving (Show, Eq, Ord, Generic)
+  } deriving (Show, Eq, Ord, Generic, Typeable)
 
 
 instance Monoid TextSpec where
@@ -178,7 +179,7 @@ data Chunk = Chunk
     -- 'X.Text' by using a list of strict 'X.Text'.  'chunkFromLazyText'
     -- 'Text' by using a list of strict 'and 'chunkFromLazyTexts' do
     -- 'Text' by using a list of strict 'this for you.
-  } deriving (Eq, Show, Ord, Generic)
+  } deriving (Eq, Show, Ord, Generic, Typeable)
   
 
 instance Str.IsString Chunk where

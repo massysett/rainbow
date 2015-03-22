@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, DeriveDataTypeable #-}
 -- | Ordinarily you should not need this module; typically you will
 -- just import "Rainbow", which re-exports the most useful things from
 -- this module.  This module also contains data constructors that
@@ -10,6 +10,7 @@ import Rainbow.Types
 import Data.Monoid
 import Data.Word (Word8)
 import GHC.Generics
+import Data.Typeable
 
 -- * 8 color
 
@@ -85,7 +86,7 @@ data Radiant = Radiant
   { rad8 :: Color8
   , rad256 :: Maybe Color256
   -- ^ If 'Nothing', use the 'rad8' color on 256-color terminals.
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, Typeable)
 
 -- | A Radiant with the same color for both 8- and 256-color
 -- terminals.

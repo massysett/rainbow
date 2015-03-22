@@ -21,68 +21,105 @@ import Data.Monoid
 import Control.Monad
 import qualified Data.Text as X
 
+varInt :: Int -> Gen b -> Gen b
+varInt = variant
+
 instance Arbitrary Enum8 where
   arbitrary = elements [E0, E1, E2, E3, E4, E5, E6, E7]
   shrink = genericShrink
 
-instance CoArbitrary Enum8
+instance CoArbitrary Enum8 where
+  coarbitrary x = case x of
+    E0 -> varInt 0
+    E1 -> varInt 1
+    E2 -> varInt 2
+    E3 -> varInt 3
+    E4 -> varInt 4
+    E5 -> varInt 5
+    E6 -> varInt 6
+    E7 -> varInt 7
 
 instance Arbitrary Color8 where
   arbitrary = fmap Color8 arbitrary
   shrink = genericShrink
 
-instance CoArbitrary Color8
+instance CoArbitrary Color8 where
+  coarbitrary (Color8 Nothing) = varInt 0
+  coarbitrary (Color8 (Just e)) = varInt 1 . coarbitrary e
 
 instance Arbitrary Color256 where
   arbitrary = fmap Color256 arbitrary
   shrink = genericShrink
 
-instance CoArbitrary Color256
+instance CoArbitrary Color256 where
+  coarbitrary (Color256 Nothing) = varInt 0
+  coarbitrary (Color256 (Just w)) = varInt 1 . coarbitrary w
 
 instance Arbitrary (Last Color8) where
   arbitrary = fmap Last arbitrary
-  shrink = genericShrink
 
-instance CoArbitrary (Last Color8)
+instance CoArbitrary (Last Color8) where
+  coarbitrary (Last Nothing) = varInt 0
+  coarbitrary (Last (Just c)) = varInt 1 . coarbitrary c
 
 instance Arbitrary (Last Color256) where
   arbitrary = fmap Last arbitrary
-  shrink = genericShrink
 
-instance CoArbitrary (Last Color256)
+instance CoArbitrary (Last Color256) where
+  coarbitrary (Last Nothing) = varInt 0
+  coarbitrary (Last (Just c)) = varInt 1 . coarbitrary c
 
 instance Arbitrary (Last Bool) where
   arbitrary = fmap Last arbitrary
-  shrink = genericShrink
 
-instance CoArbitrary (Last Bool)
+instance CoArbitrary (Last Bool) where
+  coarbitrary (Last Nothing) = varInt 0
+  coarbitrary (Last (Just b)) = varInt 1 . coarbitrary b
 
 instance Arbitrary StyleCommon where
   arbitrary
     = StyleCommon <$> g <*> g <*> g <*> g <*> g <*> g <*> g <*> g
     where
       g = fmap Last arbitrary
-  shrink = genericShrink
 
-instance CoArbitrary StyleCommon
+instance CoArbitrary StyleCommon where
+  coarbitrary (StyleCommon x0 x1 x2 x3 x4 x5 x6 x7)
+    = coarbitrary x0
+    . coarbitrary x1
+    . coarbitrary x2
+    . coarbitrary x3
+    . coarbitrary x4
+    . coarbitrary x5
+    . coarbitrary x6
+    . coarbitrary x7
+    
 
 instance Arbitrary Style256 where
   arbitrary = liftM3 Style256 arbitrary arbitrary arbitrary
-  shrink = genericShrink
 
-instance CoArbitrary Style256
+instance CoArbitrary Style256 where
+  coarbitrary (Style256 x0 x1 x2)
+    = coarbitrary x0
+    . coarbitrary x1
+    . coarbitrary x2
 
 instance Arbitrary Style8 where
   arbitrary = liftM3 Style8 arbitrary arbitrary arbitrary
-  shrink = genericShrink
 
-instance CoArbitrary Style8
+instance CoArbitrary Style8 where
+  coarbitrary (Style8 x0 x1 x2)
+    = coarbitrary x0
+    . coarbitrary x1
+    . coarbitrary x2
 
 instance Arbitrary TextSpec where
   arbitrary = liftM2 TextSpec arbitrary arbitrary
   shrink = genericShrink
 
-instance CoArbitrary TextSpec
+instance CoArbitrary TextSpec where
+  coarbitrary (TextSpec x0 x1)
+    = coarbitrary x0
+    . coarbitrary x1
 
 instance Arbitrary X.Text where
   arbitrary = fmap X.pack arbitrary
@@ -101,4 +138,7 @@ instance Arbitrary Radiant where
   arbitrary = liftM2 Radiant arbitrary arbitrary
   shrink = genericShrink
 
-instance CoArbitrary Radiant
+instance CoArbitrary Radiant where
+  coarbitrary (Radiant x0 x1)
+    = coarbitrary x0
+    . coarbitrary x1
