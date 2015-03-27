@@ -1,20 +1,40 @@
-language: haskell
-ghc:
-  - 7.6
-  - 7.8
+env:
+  - CABALVER=1.18 GHCVER=7.8.3
+  - CABALVER=1.22 GHCVER=7.10.1
 
 before_install:
-  - cabal update
-  - cabal install cartel packdeps
-  - sh generate
-  - packdeps rainbow.cabal
+ - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
+ - travis_retry sudo apt-get update
+ - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER # see note about happy/alex
+ - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
+
 
 install:
-  - cabal install --only-dependencies
+ - cabal --version
+ - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+ - travis_retry cabal update
+ - cabal install cartel packdeps
+ - sh generate
+ - packdeps rainbow.cabal
+ - cabal install --only-dependencies --enable-tests --enable-benchmarks
+ - ghc-pkg list
 
+
+# Put actual building steps in here.
 script:
-  - ghc-pkg list
-  - cabal sdist --output-directory=tarball
-  - cd tarball
-  - pwd
-  - cabal install
+  - cabal configure --enable-tests -v2
+  - cabal build
+  - cabal test
+  - cabal check
+  - cabal sdist
+
+# The following scriptlet checks that the resulting source
+# distribution can be built & installed
+ - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
+   cd dist/;
+   if [ -f "$SRC_TGZ" ]; then
+      cabal install --force-reinstalls "$SRC_TGZ";
+   else
+      echo "expected '$SRC_TGZ' not found";
+      exit 1;
+   fi

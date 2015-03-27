@@ -5,12 +5,12 @@
 import Cartel
 
 rainbowVersion :: [Word]
-rainbowVersion = [0,22,0,0]
+rainbowVersion = [0,22,0,2]
 
 -- Dependencies
 
 base :: Package
-base = closedOpen "base" [4,5,0,0] [4,8,0,0]
+base = closedOpen "base" [4,7,0,0] [4,9,0,0]
 
 text :: Package
 text = closedOpen "text" [0,11,2,0] [1,3,0,0]
@@ -36,7 +36,7 @@ properties :: Properties
 properties = blank
   { name = "rainbow"
   , version = rainbowVersion
-  , cabalVersion = Just (1,16)
+  , cabalVersion = Just (1,18)
   , buildType = Just simple
   , license = Just bsd3
   , licenseFile = "LICENSE"
@@ -54,7 +54,7 @@ properties = blank
     , "of how it should appear. Rainbow works with both 8-color and 256-color"
     , "terminals."
     ]
-  , testedWith = map (\ls -> (ghc, eq ls)) [[7,6,3], [7,8,2]]
+  , testedWith = map (\ls -> (ghc, eq ls)) [[7,8,2], [7,10,1]]
   }
 
 visualTest
