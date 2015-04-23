@@ -24,11 +24,15 @@ quickCheck = closedOpen "QuickCheck" [2,7] [2,9]
 process :: Package
 process = closedOpen "process" [1,2] [1,3]
 
+lens :: Package
+lens = closedOpen "lens" [4,9,1] [4,10]
+
 commonOptions :: HasBuildInfo a => [a]
 commonOptions =
   [ haskell2010
   , ghcOptions ["-Wall"]
-  , buildDepends [base, text, bytestring, process]
+  , otherExtensions ["TemplateHaskell"]
+  , buildDepends [base, text, bytestring, process, lens]
   , hsSourceDirs ["lib"]
   ]
 

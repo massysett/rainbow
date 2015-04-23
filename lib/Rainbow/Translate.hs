@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Rainbow.Translate where
 
+{-
+
 import Data.Monoid
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString as BS
@@ -336,3 +338,4 @@ putChunk ck = do
 -- of them.
 putChunkLn :: T.Chunk -> IO ()
 putChunkLn ck = putChunk ck >> putStrLn ""
+-}

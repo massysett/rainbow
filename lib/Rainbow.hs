@@ -1,3 +1,11 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 -- | Rainbow handles colors and special effects for text.
 --
 -- The building block of Rainbow is the 'Chunk'. Each 'Chunk' comes with
@@ -85,7 +93,142 @@
 -- terminal. That is, if you want to print some text in one color and
 -- some text in another color, make two chunks.
 
-module Rainbow
+
+module Rainbow where
+
+-- # Imports
+
+import qualified Data.String as Str
+import Data.Monoid
+import Data.Text (Text)
+import qualified Data.Text as X
+import qualified Data.Text.Lazy as XL
+import Data.Word (Word8)
+import GHC.Generics
+import Data.Typeable
+import Data.Foldable ()
+import Data.Traversable ()
+import Control.Lens
+import Data.Foldable (Foldable)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
+import Data.ByteString (ByteString)
+import Data.List (intersperse)
+
+--
+-- Colors
+--
+
+-- | A simple enumeration for eight values.
+data Enum8
+  = E0
+  | E1
+  | E2
+  | E3
+  | E4
+  | E5
+  | E6
+  | E7
+  deriving (Eq, Ord, Show, Bounded, Enum, Generic, Typeable)
+
+enum8toWord8 :: Enum8 -> Word8
+enum8toWord8 e = case e of
+  E0 -> 0
+  E1 -> 1
+  E2 -> 2
+  E3 -> 3
+  E4 -> 4
+  E5 -> 5
+  E6 -> 6
+  E7 -> 7
+
+--
+-- Styles
+--
+
+-- | Style elements that apply in both 8 and 256 color
+-- terminals. However, the elements are described separately for 8 and
+-- 256 color terminals, so that the text appearance can change
+-- depending on how many colors a terminal has.
+data Format = Format
+  { _bold :: Bool
+  , _faint :: Bool
+  , _italic :: Bool
+  , _underline :: Bool
+  , _blink :: Bool
+  , _inverse :: Bool
+  , _invisible :: Bool
+  , _strikeout :: Bool
+  } deriving (Show, Eq, Ord, Generic, Typeable)
+
+makeLenses ''Format
+
+data Style a = Style
+  { _fore :: Maybe a
+  , _back :: Maybe a
+  , _format :: Format
+  } deriving (Show, Eq, Ord, Generic, Typeable, Functor, Foldable,
+              Traversable)
+
+makeLenses ''Style
+
+-- | The Scheme bundles together the styles for the 8 and 256 color
+-- terminals, so that the text can be portrayed on any terminal.
+data Scheme = Scheme
+  { _c8 :: Style Enum8
+  , _c256 :: Style Word8
+  } deriving (Show, Eq, Ord, Generic, Typeable)
+
+makeLenses ''Scheme
+
+--
+-- Chunks
+--
+
+-- | A chunk is some textual data coupled with a description of what
+-- color the text is, attributes like whether it is bold or
+-- underlined, etc. The chunk knows what foreground and background
+-- colors and what attributes to use for both an 8 color terminal and
+-- a 256 color terminal.
+
+data Chunk a = Chunk
+  { _scheme :: Scheme
+  , _yarn :: a
+  } deriving (Eq, Show, Ord, Generic, Typeable, Functor,
+              Foldable, Traversable)
+
+makeLenses ''Chunk
+
+class Renderable a where
+  render :: a -> [ByteString] -> [ByteString]
+
+instance Renderable Char where
+  render c = ((BS8.singleton c) :)
+
+escape :: [ByteString] -> [ByteString]
+escape = render '\x1B'
+
+csi :: [ByteString] -> [ByteString]
+csi = escape . render '['
+
+sgr :: ([ByteString] -> [ByteString]) -> [ByteString] -> [ByteString]
+sgr sq = csi . sq . render 'm'
+
+params :: Show a => [a] -> [ByteString] -> [ByteString]
+params cs = ((intersperse ";" . map (BS8.pack . show) $ cs) ++)
+
+sgrSingle :: Word -> [ByteString] -> [ByteString]
+sgrSingle w = sgr $ params [w]
+
+sgrDouble :: Word -> Word -> [ByteString] -> [ByteString]
+sgrDouble x y = sgr $ params [x, y]
+
+normalDefault :: [ByteString] -> [ByteString]
+normalDefault = sgrSingle 0
+
+
+
+{-
   (
 
   -- * Chunks
@@ -327,4 +470,5 @@ Terminfo altogether.
 Apparently it's difficult to get ISO 6429 support on Microsoft
 Windows.  Oh well.
 
+-}
 -}
