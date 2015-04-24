@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Rainbow.Translate where
 
@@ -38,6 +37,11 @@ instance Renderable BS.ByteString where
 instance Renderable BSL.ByteString where
   render x = (BSL.toChunks x ++)
 
+-- | Strings are converted first to a strict Text and then to a strict
+-- ByteString.
+instance Renderable String where
+  render x = ((X.encodeUtf8 . X.pack $ x):)
+
 single :: Char -> [ByteString] -> [ByteString]
 single c = ((BS8.singleton c):)
 
@@ -51,7 +55,9 @@ sgr :: ([ByteString] -> [ByteString]) -> [ByteString] -> [ByteString]
 sgr sq = csi . sq . single 'm'
 
 params :: Show a => [a] -> [ByteString] -> [ByteString]
-params cs = ((intersperse ";" . map (BS8.pack . show) $ cs) ++)
+params cs = ((intersperse semi . map (BS8.pack . show) $ cs) ++)
+  where
+    semi = BS8.singleton ';'
 
 sgrSingle :: Word -> [ByteString] -> [ByteString]
 sgrSingle w = sgr $ params [w]
@@ -194,7 +200,7 @@ instance Renderable (T.Style T.Enum8) where
     . effect backColor8 back
     . render format
     where
-      effect on = maybe id on
+      effect on (T.Color may) = maybe id on may
 
 instance Renderable (T.Style Word8) where
   render (T.Style fore back format)
@@ -202,7 +208,7 @@ instance Renderable (T.Style Word8) where
     . effect back256 back
     . render format
     where
-      effect on = maybe id on
+      effect on (T.Color may) = maybe id on may
 
 toByteStringsColors0
   :: Renderable a

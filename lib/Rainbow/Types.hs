@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric, DeriveDataTypeable, DeriveFunctor,
-             DeriveTraversable, DeriveFoldable, TemplateHaskell #-}
+             DeriveTraversable, DeriveFoldable, TemplateHaskell,
+             FlexibleInstances, TypeFamilies,
+             MultiParamTypeClasses #-}
 
 -- | The innards of Rainbow.  Ordinarily you should not need this
 -- module; instead, just import "Rainbow", which
@@ -9,12 +11,6 @@ module Rainbow.Types where
 
 -- # Imports
 
-import qualified Data.String as Str
-import Data.Functor
-import Data.Monoid
-import Data.Text (Text)
-import qualified Data.Text as X
-import qualified Data.Text.Lazy as XL
 import Data.Word (Word8)
 import GHC.Generics
 import Data.Typeable
@@ -22,10 +18,32 @@ import Data.Foldable ()
 import Data.Traversable ()
 import Control.Lens
 import Data.Foldable (Foldable)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
+import qualified Data.Text as X
+import qualified Data.Text.Lazy as XL
+
+--
+-- Blank
+--
+
+-- | Something is Blank if, upon rendering, it has no visible effect
+-- on the terminal.
+class Blank a where
+  blank :: a
 
 --
 -- Colors
 --
+
+newtype Color a = Color (Maybe a)
+  deriving (Eq, Show, Ord, Generic, Typeable, Functor, Foldable,
+            Traversable)
+
+makeWrapped ''Color
+
+instance Blank (Color a) where
+  blank = Color Nothing
 
 -- | A simple enumeration for eight values.
 data Enum8
@@ -71,14 +89,20 @@ data Format = Format
 
 makeLenses ''Format
 
+instance Blank Format where
+  blank = Format False False False False False False False False
+
 data Style a = Style
-  { _fore :: Maybe a
-  , _back :: Maybe a
+  { _fore :: Color a
+  , _back :: Color a
   , _format :: Format
   } deriving (Show, Eq, Ord, Generic, Typeable, Functor, Foldable,
               Traversable)
 
 makeLenses ''Style
+
+instance Blank (Style a) where
+  blank = Style blank blank blank
 
 --
 -- Chunks
@@ -96,5 +120,8 @@ data Chunk a = Chunk
   , _yarn :: a
   } deriving (Eq, Show, Ord, Generic, Typeable, Functor,
               Foldable, Traversable)
+
+instance Blank a => Blank (Chunk a) where
+  blank = Chunk blank blank blank
 
 makeLenses ''Chunk

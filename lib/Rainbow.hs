@@ -7,226 +7,77 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Rainbow handles colors and special effects for text.
---
--- The building block of Rainbow is the 'Chunk'. Each 'Chunk' comes with
--- a 'TextSpec', which specifies how the text should look on 8-color
--- and on 256-color terminals. The 'Chunk' is a full specification; that
--- is, although 'Chunk's are typically printed one after the other, the
--- appearance of one 'Chunk' does not affect the appearance of the next
--- 'Chunk'.
---
--- You have full freedom to specify different attributes and colors
--- for 8 and 256 color terminals; for instance, you can have text
--- appear red on an 8-color terminal but blue on a 256-color terminal.
---
--- A 'Chunk' is a 'Monoid', so you can combine them using
--- the usual monoid functions, including '<>'. You can
--- create a 'Chunk' with text using 'Data.String.fromString', but this
--- library is much more usable if you enable the OverloadedStrings GHC
--- extension:
---
--- > {-# LANGUAGE OverloadedStrings #-}
---
--- or, in GHCi:
---
--- >>> :set -XOverloadedStrings
---
--- and all future examples assume you have enabled OverloadedStrings.
---
--- Here are some basic examples:
---
--- @
--- 'putChunkLn' $ \"Some blue text\" \<> 'fore' 'blue'
--- 'putChunkLn' $ \"Blue on red background\"
---               \<> 'fore' 'blue' \<> 'back' 'red'
--- 'putChunkLn' $ \"Blue on red, foreground bold\"
---                \<> 'fore' 'blue' \<> 'back' 'red' \<> 'bold'
--- @
---
--- But what makes Rainbow a little more interesting is that you can
--- also specify output for 256-color terminals. To use these examples,
--- be sure your TERM environment variable is set to something that
--- supports 256 colors (like @xterm-256color@) before you start GHCi.
---
--- @
--- 'putChunkLn' $ \"Blue on 8-color terminal, red on 256-color terminal\"
---                 \<> 'fore' 'blue8' \<> 'fore' ('to256' 'red8')
--- @
---
--- To get a 'Color256', which affects only 256-color terminals, there
--- are some definitions in the module such as 'brightRed'.  You may
--- also use 'Word8' literals, like this.  You need to specify the type
--- as it can't be inferred:
---
--- @
--- 'putChunkLn' $ \"Pink on 256-color terminal only\"
---                \<> 'fore' (201 :: 'Word8')
--- @
---
--- If you 'mappend' multiple chunks that change the same property, the
--- rightmost one \"wins\":
---
--- @
--- 'putChunkLn' $ \"This will be blue\" \<> 'fore' 'red' \<> 'fore' 'blue'
--- @
---
--- This property comes in handy if you want to specify a default color
--- for 8- and 256-color terminals, then a more specific shade for a
--- 256-color terminal:
---
--- @
--- 'putChunkLn' $ \"Red on 8-color, pink on 256-color\"
---                \<> 'fore' 'red' \<> 'fore' (201 :: 'Word8')
--- @
---
--- However, if you use 'mappend' to add additional 'Chunk's that have
--- text, the text will be appended:
---
--- @
--- 'putChunkLn' $ 'fore' 'green' \<> \"You will see this text \"
---              \<> \"and this text too, but it will all be blue\"
---              \<> 'fore' 'blue'
--- @
---
--- Although one chunk can have different colors on 8- and 256-color
--- terminals, it cannot have different colors on the same
--- terminal. That is, if you want to print some text in one color and
--- some text in another color, make two chunks.
 
+module Rainbow
+  ( Blank(..)
 
-module Rainbow where
+  -- * Colors
+  , Color(..)
+  , Enum8(..)
+  , enum8toWord8
 
--- # Imports
+  -- * Format
+  , Format(..)
+  , bold
+  , faint
+  , italic
+  , underline
+  , blink
+  , inverse
+  , invisible
+  , strikeout
 
-import qualified Data.String as Str
-import Data.Monoid
-import Data.Text (Text)
-import qualified Data.Text as X
-import qualified Data.Text.Lazy as XL
-import Data.Word (Word8)
-import GHC.Generics
-import Data.Typeable
-import Data.Foldable ()
-import Data.Traversable ()
+  -- * Style
+  , Style(..)
+  , fore
+  , back
+  , format
+
+  -- * Chunk
+  , Chunk(..)
+  , style8
+  , style256
+  , yarn
+
+  -- * Converting 'Chunk' to 'Data.ByteString.ByteString'
+
+  -- | To print a 'Chunk', you need to convert it to some
+  -- 'Data.ByteString.ByteString's.
+  --
+  -- All these functions convert the 'Data.Text' to UTF-8
+  -- 'Data.ByteString.ByteString's.  Many of these functions return a
+  -- difference list.  Learn You a Haskell for Great Good has a great
+  -- explanation of difference lists:
+  --
+  -- http://learnyouahaskell.com/for-a-few-monads-more
+  --
+  -- If you don't want to learn about difference lists, just stick
+  -- with using 'chunksToByteStrings' and use
+  -- 'byteStringMakerFromEnvironment' if you want to use the highest
+  -- number of colors possible, or, to manually specify the number of
+  -- colors, use 'chunksToByteStrings' with 'toByteStringsColors0',
+  -- 'toByteStringsColors8', or 'toByteStringsColors256' as the first
+  -- argument.  'chunksToByteStrings' has an example.
+  , T.Renderable(..)
+  , T.toByteStringsColors0
+  , T.toByteStringsColors8
+  , T.toByteStringsColors256
+  , T.byteStringMakerFromEnvironment
+  , T.byteStringMakerFromHandle
+  , T.chunksToByteStrings
+
+  -- * Quick and dirty functions for IO
+
+  -- | For efficiency reasons you probably don't want to use these
+  -- when printing large numbers of 'Chunk', but they are handy for
+  -- throwaway uses like experimenting in GHCi.
+  , T.putChunk
+  , T.putChunkLn
+  ) where
+
+import qualified Rainbow.Translate as T
+import Rainbow.Types
 import Control.Lens
-import Data.Foldable (Foldable)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BS8
-import Data.ByteString (ByteString)
-import Data.List (intersperse)
-
---
--- Colors
---
-
--- | A simple enumeration for eight values.
-data Enum8
-  = E0
-  | E1
-  | E2
-  | E3
-  | E4
-  | E5
-  | E6
-  | E7
-  deriving (Eq, Ord, Show, Bounded, Enum, Generic, Typeable)
-
-enum8toWord8 :: Enum8 -> Word8
-enum8toWord8 e = case e of
-  E0 -> 0
-  E1 -> 1
-  E2 -> 2
-  E3 -> 3
-  E4 -> 4
-  E5 -> 5
-  E6 -> 6
-  E7 -> 7
-
---
--- Styles
---
-
--- | Style elements that apply in both 8 and 256 color
--- terminals. However, the elements are described separately for 8 and
--- 256 color terminals, so that the text appearance can change
--- depending on how many colors a terminal has.
-data Format = Format
-  { _bold :: Bool
-  , _faint :: Bool
-  , _italic :: Bool
-  , _underline :: Bool
-  , _blink :: Bool
-  , _inverse :: Bool
-  , _invisible :: Bool
-  , _strikeout :: Bool
-  } deriving (Show, Eq, Ord, Generic, Typeable)
-
-makeLenses ''Format
-
-data Style a = Style
-  { _fore :: Maybe a
-  , _back :: Maybe a
-  , _format :: Format
-  } deriving (Show, Eq, Ord, Generic, Typeable, Functor, Foldable,
-              Traversable)
-
-makeLenses ''Style
-
--- | The Scheme bundles together the styles for the 8 and 256 color
--- terminals, so that the text can be portrayed on any terminal.
-data Scheme = Scheme
-  { _c8 :: Style Enum8
-  , _c256 :: Style Word8
-  } deriving (Show, Eq, Ord, Generic, Typeable)
-
-makeLenses ''Scheme
-
---
--- Chunks
---
-
--- | A chunk is some textual data coupled with a description of what
--- color the text is, attributes like whether it is bold or
--- underlined, etc. The chunk knows what foreground and background
--- colors and what attributes to use for both an 8 color terminal and
--- a 256 color terminal.
-
-data Chunk a = Chunk
-  { _scheme :: Scheme
-  , _yarn :: a
-  } deriving (Eq, Show, Ord, Generic, Typeable, Functor,
-              Foldable, Traversable)
-
-makeLenses ''Chunk
-
-class Renderable a where
-  render :: a -> [ByteString] -> [ByteString]
-
-instance Renderable Char where
-  render c = ((BS8.singleton c) :)
-
-escape :: [ByteString] -> [ByteString]
-escape = render '\x1B'
-
-csi :: [ByteString] -> [ByteString]
-csi = escape . render '['
-
-sgr :: ([ByteString] -> [ByteString]) -> [ByteString] -> [ByteString]
-sgr sq = csi . sq . render 'm'
-
-params :: Show a => [a] -> [ByteString] -> [ByteString]
-params cs = ((intersperse ";" . map (BS8.pack . show) $ cs) ++)
-
-sgrSingle :: Word -> [ByteString] -> [ByteString]
-sgrSingle w = sgr $ params [w]
-
-sgrDouble :: Word -> Word -> [ByteString] -> [ByteString]
-sgrDouble x y = sgr $ params [x, y]
-
-normalDefault :: [ByteString] -> [ByteString]
-normalDefault = sgrSingle 0
-
-
 
 {-
   (
@@ -336,25 +187,6 @@ normalDefault = sgrSingle 0
   , brightWhite
   , to256
 
-  -- * Converting 'Chunk' to 'Data.ByteString.ByteString'
-
-  -- | To print a 'Chunk', you need to convert it to some
-  -- 'Data.ByteString.ByteString's.
-  --
-  -- All these functions convert the 'Data.Text' to UTF-8
-  -- 'Data.ByteString.ByteString's.  Many of these functions return a
-  -- difference list.  Learn You a Haskell for Great Good has a great
-  -- explanation of difference lists:
-  --
-  -- http://learnyouahaskell.com/for-a-few-monads-more
-  --
-  -- If you don't want to learn about difference lists, just stick
-  -- with using 'chunksToByteStrings' and use
-  -- 'byteStringMakerFromEnvironment' if you want to use the highest
-  -- number of colors possible, or, to manually specify the number of
-  -- colors, use 'chunksToByteStrings' with 'toByteStringsColors0',
-  -- 'toByteStringsColors8', or 'toByteStringsColors256' as the first
-  -- argument.  'chunksToByteStrings' has an example.
   , byteStringMakerFromEnvironment
   , byteStringMakerFromHandle
   , toByteStringsColors0
@@ -362,11 +194,6 @@ normalDefault = sgrSingle 0
   , toByteStringsColors256
   , chunksToByteStrings
 
-  -- * Quick and dirty functions for IO
-
-  -- | For efficiency reasons you probably don't want to use these
-  -- when printing large numbers of 'Chunk', but they are handy for
-  -- throwaway uses like experimenting in GHCi.
   , putChunk
   , putChunkLn
 
@@ -460,7 +287,7 @@ support the ISO 6429 codes are those that are not really terminals.
 For instance, you might use an Emacs shell buffer.  For those
 situations just use 'toByteStringsColors0'.
 
-I also decided to standardize on UTF-8 for the 'Text' output..  These
+I also decided to standardize on UTF-8 for the 'Text' output.  These
 days that seems reasonable.
 
 Now, to figure out how many colors the terminal supports, Rainbow
