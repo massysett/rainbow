@@ -32,6 +32,21 @@ import qualified Data.Text.Lazy as XL
 class Blank a where
   blank :: a
 
+instance Blank String where
+  blank = ""
+
+instance Blank BS.ByteString where
+  blank = BS.empty
+
+instance Blank BSL.ByteString where
+  blank = BSL.empty
+
+instance Blank X.Text where
+  blank = X.empty
+
+instance Blank XL.Text where
+  blank = XL.empty
+
 --
 -- Colors
 --
@@ -120,6 +135,9 @@ data Chunk a = Chunk
   , _yarn :: a
   } deriving (Eq, Show, Ord, Generic, Typeable, Functor,
               Foldable, Traversable)
+
+chunk :: a -> Chunk a
+chunk = Chunk blank blank
 
 instance Blank a => Blank (Chunk a) where
   blank = Chunk blank blank blank

@@ -181,34 +181,34 @@ backColor8 e8 = case e8 of
   T.E6 -> backCyan
   T.E7 -> backWhite
 
-instance Renderable T.Format where
-  render (T.Format bld fnt ita und bli ivr isb stk)
-    = effect bold bld
-    . effect faint fnt
-    . effect italic ita
-    . effect underline und
-    . effect blink bli
-    . effect inverse ivr
-    . effect invisible isb
-    . effect strikeout stk
-    where
-      effect on x = if x then on else id
+renderFormat :: T.Format -> [ByteString] -> [ByteString]
+renderFormat (T.Format bld fnt ita und bli ivr isb stk)
+  = effect bold bld
+  . effect faint fnt
+  . effect italic ita
+  . effect underline und
+  . effect blink bli
+  . effect inverse ivr
+  . effect invisible isb
+  . effect strikeout stk
+  where
+    effect on x = if x then on else id
 
-instance Renderable (T.Style T.Enum8) where
-  render (T.Style fore back format)
-    = effect foreColor8 fore
-    . effect backColor8 back
-    . render format
-    where
+renderStyle8 :: T.Style T.Enum8 -> [ByteString] -> [ByteString]
+renderStyle8 (T.Style fore back format)
+  = effect foreColor8 fore
+  . effect backColor8 back
+  . renderFormat format
+  where
       effect on (T.Color may) = maybe id on may
 
-instance Renderable (T.Style Word8) where
-  render (T.Style fore back format)
-    = effect fore256 fore
-    . effect back256 back
-    . render format
-    where
-      effect on (T.Color may) = maybe id on may
+renderStyle256 :: T.Style Word8 -> [ByteString] -> [ByteString]
+renderStyle256 (T.Style fore back format)
+  = effect fore256 fore
+  . effect back256 back
+  . renderFormat format
+  where
+    effect on (T.Color may) = maybe id on may
 
 toByteStringsColors0
   :: Renderable a
@@ -224,7 +224,7 @@ toByteStringsColors8
   -> [ByteString]
 toByteStringsColors8 (T.Chunk s8 _ yn)
   = normalDefault
-  . render s8
+  . renderStyle8 s8
   . render yn
   . normalDefault
 
@@ -235,7 +235,7 @@ toByteStringsColors256
   -> [ByteString]
 toByteStringsColors256 (T.Chunk _ s256 yn)
   = normalDefault
-  . render s256
+  . renderStyle256 s256
   . render yn
   . normalDefault
 

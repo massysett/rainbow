@@ -5,19 +5,26 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | Rainbow handles colors and special effects for text.
 
 module Rainbow
-  ( Blank(..)
+  ( Y.Blank(..)
 
   -- * Colors
-  , Color(..)
-  , Enum8(..)
-  , enum8toWord8
+  , Y.Color(..)
 
   -- * Format
-  , Format(..)
+  , Y.Format
+
+  -- * Style
+  , Y.Style
+
+  -- * Chunk
+  , Y.Chunk
+
+  -- * Formatting, all terminals
   , bold
   , faint
   , italic
@@ -26,18 +33,6 @@ module Rainbow
   , inverse
   , invisible
   , strikeout
-
-  -- * Style
-  , Style(..)
-  , fore
-  , back
-  , format
-
-  -- * Chunk
-  , Chunk(..)
-  , style8
-  , style256
-  , yarn
 
   -- * Converting 'Chunk' to 'Data.ByteString.ByteString'
 
@@ -76,8 +71,36 @@ module Rainbow
   ) where
 
 import qualified Rainbow.Translate as T
-import Rainbow.Types
+import qualified Rainbow.Types as Y
 import Control.Lens
+
+formatBoth :: Setter' Y.Format Bool -> Y.Chunk a -> Y.Chunk a
+formatBoth get c = c & Y.style8 . Y.format . get .~ True
+  & Y.style256 . Y.format . get .~ True
+
+bold :: Y.Chunk a -> Y.Chunk a
+bold = formatBoth Y.bold
+
+faint :: Y.Chunk a -> Y.Chunk a
+faint = formatBoth Y.faint
+
+italic :: Y.Chunk a -> Y.Chunk a
+italic = formatBoth Y.italic
+
+underline :: Y.Chunk a -> Y.Chunk a
+underline = formatBoth Y.underline
+
+blink :: Y.Chunk a -> Y.Chunk a
+blink = formatBoth Y.blink
+
+inverse :: Y.Chunk a -> Y.Chunk a
+inverse = formatBoth Y.inverse
+
+invisible :: Y.Chunk a -> Y.Chunk a
+invisible = formatBoth Y.invisible
+
+strikeout :: Y.Chunk a -> Y.Chunk a
+strikeout = formatBoth Y.strikeout
 
 {-
   (
