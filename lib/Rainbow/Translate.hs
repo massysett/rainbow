@@ -1,25 +1,42 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Rainbow.Translate where
 
-{-
-
-import Data.Monoid
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
+import qualified Data.Text as X
+import qualified Data.Text.Encoding as X
+import qualified Data.Text.Lazy as XL
 import Data.ByteString (ByteString)
 import Data.Word
 import Data.List (intersperse)
-import Rainbow.Types
-  ( Color8(..), Enum8(..), Color256(..),
-    StyleCommon(..), Style8(..), Style256(..), TextSpec)
 import qualified Rainbow.Types as T
-import Data.Text.Encoding
 import System.Process
 import Text.Read
 import System.Exit
 import Control.Monad
 import Control.Exception
 import qualified System.IO as IO
+
+class Renderable a where
+  render :: a -> [ByteString] -> [ByteString]
+
+-- | Convers a strict Text to a UTF-8 ByteString.
+instance Renderable X.Text where
+  render x = (X.encodeUtf8 x :)
+
+-- | Converts a lazy Text to UTF-8 ByteStrings.
+instance Renderable XL.Text where
+  render = foldr (.) id . map render . XL.toChunks
+
+-- | Strict ByteString is left as-is.
+instance Renderable BS.ByteString where
+  render x = (x :)
+
+-- | Lazy ByteString is converted to strict chunks.
+instance Renderable BSL.ByteString where
+  render x = (BSL.toChunks x ++)
 
 single :: Char -> [ByteString] -> [ByteString]
 single c = ((BS8.singleton c):)
@@ -136,103 +153,86 @@ fore256 c = sgr $ params [38,5,c]
 back256 :: Word8 -> [ByteString] -> [ByteString]
 back256 c = sgr $ params [48,5,c]
 
-foreColor8 :: Color8 -> [ByteString] -> [ByteString]
-foreColor8 (Color8 maym8) = case maym8 of
-  Nothing -> id
-  Just m8 -> case m8 of
-    E0 -> foreBlack
-    E1 -> foreRed
-    E2 -> foreGreen
-    E3 -> foreYellow
-    E4 -> foreBlue
-    E5 -> foreMagenta
-    E6 -> foreCyan
-    E7 -> foreWhite
+foreColor8 :: T.Enum8 -> [ByteString] -> [ByteString]
+foreColor8 e8 = case e8 of
+  T.E0 -> foreBlack
+  T.E1 -> foreRed
+  T.E2 -> foreGreen
+  T.E3 -> foreYellow
+  T.E4 -> foreBlue
+  T.E5 -> foreMagenta
+  T.E6 -> foreCyan
+  T.E7 -> foreWhite
 
-backColor8 :: Color8 -> [ByteString] -> [ByteString]
-backColor8 (Color8 maym8) = case maym8 of
-  Nothing -> id
-  Just m8 -> case m8 of
-    E0 -> backBlack
-    E1 -> backRed
-    E2 -> backGreen
-    E3 -> backYellow
-    E4 -> backBlue
-    E5 -> backMagenta
-    E6 -> backCyan
-    E7 -> backWhite
+backColor8 :: T.Enum8 -> [ByteString] -> [ByteString]
+backColor8 e8 = case e8 of
+  T.E0 -> backBlack
+  T.E1 -> backRed
+  T.E2 -> backGreen
+  T.E3 -> backYellow
+  T.E4 -> backBlue
+  T.E5 -> backMagenta
+  T.E6 -> backCyan
+  T.E7 -> backWhite
 
-foreColor256 :: Color256 -> [ByteString] -> [ByteString]
-foreColor256 (Color256 mayW8) = case mayW8 of
-  Nothing -> id
-  Just w8 -> fore256 w8
+instance Renderable T.Format where
+  render (T.Format bld fnt ita und bli ivr isb stk)
+    = effect bold bld
+    . effect faint fnt
+    . effect italic ita
+    . effect underline und
+    . effect blink bli
+    . effect inverse ivr
+    . effect invisible isb
+    . effect strikeout stk
+    where
+      effect on x = if x then on else id
 
-backColor256 :: Color256 -> [ByteString] -> [ByteString]
-backColor256 (Color256 mayW8) = case mayW8 of
-  Nothing -> id
-  Just w8 -> back256 w8
+instance Renderable (T.Style T.Enum8) where
+  render (T.Style fore back format)
+    = effect foreColor8 fore
+    . effect backColor8 back
+    . render format
+    where
+      effect on = maybe id on
 
-styleCommon :: StyleCommon -> [ByteString] -> [ByteString]
-styleCommon (StyleCommon bld fnt ita und bli ivr isb stk)
-  = effect bold bld
-  . effect faint fnt
-  . effect italic ita
-  . effect underline und
-  . effect blink bli
-  . effect inverse ivr
-  . effect invisible isb
-  . effect strikeout stk
-  where
-    effect on = maybe id (\x -> if x then on else id)
-      . getLast
+instance Renderable (T.Style Word8) where
+  render (T.Style fore back format)
+    = effect fore256 fore
+    . effect back256 back
+    . render format
+    where
+      effect on = maybe id on
 
-style8 :: Style8 -> [ByteString] -> [ByteString]
-style8 (Style8 f8 b8 sc)
-  = effect foreColor8 f8
-  . effect backColor8 b8
-  . styleCommon sc
-  where
-    effect on = maybe id on . getLast
+toByteStringsColors0
+  :: Renderable a
+  => T.Chunk a
+  -> [ByteString]
+  -> [ByteString]
+toByteStringsColors0 (T.Chunk _ _ yn) = render yn
 
-style256 :: Style256 -> [ByteString] -> [ByteString]
-style256 (Style256 f256 b256 sc)
-  = effect foreColor256 f256
-  . effect backColor256 b256
-  . styleCommon sc
-  where
-    effect on = maybe id on . getLast
-
-textSpec8 :: TextSpec -> [ByteString] -> [ByteString]
-textSpec8 = style8 . T.style8
-
-textSpec256 :: TextSpec -> [ByteString] -> [ByteString]
-textSpec256 = style256 . T.style256
-
--- | Convert a 'T.Chunk' to a list of 'ByteString'; do not show any
--- colors.  When applied to a 'T.Chunk', this function returns a
--- difference list.
-toByteStringsColors0 :: T.Chunk -> [ByteString] -> [ByteString]
-toByteStringsColors0 c = ((map encodeUtf8 . T.chunkTexts $ c) ++)
-
--- | Convert a 'T.Chunk' to a list of 'ByteString'; show eight
--- colors.  When applied to a 'T.Chunk', this function returns a
--- difference list.
-toByteStringsColors8 :: T.Chunk -> [ByteString] -> [ByteString]
-toByteStringsColors8 c
+toByteStringsColors8
+  :: Renderable a
+  => T.Chunk a
+  -> [ByteString]
+  -> [ByteString]
+toByteStringsColors8 (T.Chunk s8 _ yn)
   = normalDefault
-  . textSpec8 (T.chunkTextSpec c)
-  . ((map encodeUtf8 . T.chunkTexts $ c) ++)
+  . render s8
+  . render yn
   . normalDefault
 
--- | Convert a 'T.Chunk' to a list of 'ByteString'; show 256
--- colors.  When applied to a 'T.Chunk', this function returns a
--- difference list.
-toByteStringsColors256 :: T.Chunk -> [ByteString] -> [ByteString]
-toByteStringsColors256 c
+toByteStringsColors256
+  :: Renderable a
+  => T.Chunk a
+  -> [ByteString]
+  -> [ByteString]
+toByteStringsColors256 (T.Chunk _ s256 yn)
   = normalDefault
-  . textSpec256 (T.chunkTextSpec c)
-  . ((map encodeUtf8 . T.chunkTexts $ c) ++)
+  . render s256
+  . render yn
   . normalDefault
+
 
 
 -- | Spawns a subprocess to read the output of @tput colors@.  If this
@@ -244,7 +244,8 @@ toByteStringsColors256 c
 -- If any IO exceptions arise during this process, they are discarded
 -- and 'toByteStringsColors0' is returned.
 byteStringMakerFromEnvironment
-  :: IO (T.Chunk -> [ByteString] -> [ByteString])
+  :: Renderable a
+  => IO (T.Chunk a -> [ByteString] -> [ByteString])
 byteStringMakerFromEnvironment
   = catcher (fmap f $ readProcessWithExitCode "tput" ["colors"] "")
   where
@@ -270,8 +271,9 @@ byteStringMakerFromEnvironment
 -- 'toByteStringsColors0' is returned.  Otherwise, the value of
 -- 'byteStringMakerFromEnvironment' is returned.
 byteStringMakerFromHandle
-  :: IO.Handle
-  -> IO (T.Chunk -> [ByteString] -> [ByteString])
+  :: Renderable a
+  => IO.Handle
+  -> IO (T.Chunk a -> [ByteString] -> [ByteString])
 byteStringMakerFromHandle h = IO.hIsTerminalDevice h >>= f
   where
     f isTerm | isTerm = byteStringMakerFromEnvironment
@@ -309,10 +311,10 @@ byteStringMakerFromHandle h = IO.hIsTerminalDevice h >>= f
 -- >     $ myChunks
 
 chunksToByteStrings
-  :: (T.Chunk -> [ByteString] -> [ByteString])
+  :: (T.Chunk a -> [ByteString] -> [ByteString])
   -- ^ Function that converts 'T.Chunk' to 'ByteString'.  This
   -- function, when applied to a 'T.Chunk', returns a difference list.
-  -> [T.Chunk]
+  -> [T.Chunk a]
   -> [ByteString]
 chunksToByteStrings mk = ($ []) . foldr (.) id . map mk
 
@@ -324,7 +326,7 @@ chunksToByteStrings mk = ($ []) . foldr (.) id . map mk
 -- any speed awards.  You are better off using 'chunksToByteStrings'
 -- and the functions in "Data.ByteString" to print your 'Chunk's if
 -- you are printing a lot of them.
-putChunk :: T.Chunk -> IO ()
+putChunk :: Renderable a => T.Chunk a -> IO ()
 putChunk ck = do
   mkr <- byteStringMakerFromEnvironment
   mapM_ BS.putStr . chunksToByteStrings mkr $ [ck]
@@ -336,6 +338,5 @@ putChunk ck = do
 -- better off using 'chunksToByteStrings' and the functions in
 -- "Data.ByteString" to print your 'Chunk's if you are printing a lot
 -- of them.
-putChunkLn :: T.Chunk -> IO ()
+putChunkLn :: Renderable a => T.Chunk a -> IO ()
 putChunkLn ck = putChunk ck >> putStrLn ""
--}

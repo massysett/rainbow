@@ -10,6 +10,7 @@ module Rainbow.Types where
 -- # Imports
 
 import qualified Data.String as Str
+import Data.Functor
 import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as X
