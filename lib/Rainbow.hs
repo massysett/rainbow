@@ -10,19 +10,15 @@
 -- | Rainbow handles colors and special effects for text.
 
 module Rainbow
-  ( Y.Blank(..)
+  ( -- * Colors
+    Y.Radiant
+  , fore
+  , back
 
-  -- * Colors
-  , Y.Color(..)
-
-  -- * Format
-  , Y.Format
-
-  -- * Style
-  , Y.Style
 
   -- * Chunk
   , Y.Chunk
+  , Y.chunk
 
   -- * Formatting, all terminals
   , bold
@@ -72,6 +68,7 @@ module Rainbow
 
 import qualified Rainbow.Translate as T
 import qualified Rainbow.Types as Y
+import Data.Word (Word8)
 import Control.Lens
 
 formatBoth :: Setter' Y.Format Bool -> Y.Chunk a -> Y.Chunk a
@@ -101,6 +98,14 @@ invisible = formatBoth Y.invisible
 
 strikeout :: Y.Chunk a -> Y.Chunk a
 strikeout = formatBoth Y.strikeout
+
+fore :: Radiant -> Y.Chunk a -> Y.Chunk a
+fore (Radiant c8 c256) c = c & Y.style8 . Y.fore .~ c8
+  & Y.style256 . Y.fore .~ c256
+
+back :: Radiant -> Y.Chunk a -> Y.Chunk a
+back (Radiant c8 c256) c = c & Y.style8 . Y.back .~ c8
+  & Y.style256 . Y.back .~ c256
 
 {-
   (

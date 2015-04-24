@@ -143,3 +143,12 @@ instance Blank a => Blank (Chunk a) where
   blank = Chunk blank blank blank
 
 makeLenses ''Chunk
+
+
+data Radiant = Radiant
+  { _color8 :: Color Enum8
+  , _color256 :: Color Word8
+  } deriving (Eq, Ord, Show)
+
+makeLenses ''Radiant
+
