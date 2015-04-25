@@ -136,7 +136,7 @@ module Rainbow
   -- colors, use 'T.chunksToByteStrings' with 'T.toByteStringsColors0',
   -- 'T.toByteStringsColors8', or 'T.toByteStringsColors256' as the first
   -- argument.  'T.chunksToByteStrings' has an example.
-  , T.Renderable(..)
+  , T.Renderable
   , T.toByteStringsColors0
   , T.toByteStringsColors8
   , T.toByteStringsColors256
