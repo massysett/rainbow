@@ -117,9 +117,9 @@ module Rainbow
   , color256
   , only256
 
-  -- * Converting 'Chunk' to 'Data.ByteString.ByteString'
+  -- * Converting 'Y.Chunk' to 'Data.ByteString.ByteString'
 
-  -- | To print a 'Chunk', you need to convert it to some
+  -- | To print a 'Y.Chunk', you need to convert it to some
   -- 'Data.ByteString.ByteString's.
   --
   -- All these functions convert the 'Data.Text' to UTF-8
@@ -130,12 +130,12 @@ module Rainbow
   -- http://learnyouahaskell.com/for-a-few-monads-more
   --
   -- If you don't want to learn about difference lists, just stick
-  -- with using 'chunksToByteStrings' and use
-  -- 'byteStringMakerFromEnvironment' if you want to use the highest
+  -- with using 'T.chunksToByteStrings' and use
+  -- 'T.byteStringMakerFromEnvironment' if you want to use the highest
   -- number of colors possible, or, to manually specify the number of
-  -- colors, use 'chunksToByteStrings' with 'toByteStringsColors0',
-  -- 'toByteStringsColors8', or 'toByteStringsColors256' as the first
-  -- argument.  'chunksToByteStrings' has an example.
+  -- colors, use 'T.chunksToByteStrings' with 'T.toByteStringsColors0',
+  -- 'T.toByteStringsColors8', or 'T.toByteStringsColors256' as the first
+  -- argument.  'T.chunksToByteStrings' has an example.
   , T.Renderable(..)
   , T.toByteStringsColors0
   , T.toByteStringsColors8

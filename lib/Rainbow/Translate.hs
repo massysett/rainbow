@@ -332,23 +332,23 @@ chunksToByteStrings mk = ($ []) . foldr (.) id . map mk
 
 -- Quick and dirty I/O functions
 
--- | Writes a 'Chunk' to standard output.  Spawns a child process to
+-- | Writes a 'T.Chunk' to standard output.  Spawns a child process to
 -- read the output of @tput colors@ to determine how many colors to
 -- use, for every single chunk.  Therefore, this is not going to win
 -- any speed awards.  You are better off using 'chunksToByteStrings'
--- and the functions in "Data.ByteString" to print your 'Chunk's if
+-- and the functions in "Data.ByteString" to print your 'T.Chunk's if
 -- you are printing a lot of them.
 putChunk :: Renderable a => T.Chunk a -> IO ()
 putChunk ck = do
   mkr <- byteStringMakerFromEnvironment
   mapM_ BS.putStr . chunksToByteStrings mkr $ [ck]
 
--- | Writes a 'Chunk' to standard output, and appends a newline.
+-- | Writes a 'T.Chunk' to standard output, and appends a newline.
 -- Spawns a child process to read the output of @tput colors@ to
 -- determine how many colors to use, for every single chunk.
 -- Therefore, this is not going to win any speed awards.  You are
 -- better off using 'chunksToByteStrings' and the functions in
--- "Data.ByteString" to print your 'Chunk's if you are printing a lot
+-- "Data.ByteString" to print your 'T.Chunk's if you are printing a lot
 -- of them.
 putChunkLn :: Renderable a => T.Chunk a -> IO ()
 putChunkLn ck = putChunk ck >> putStrLn ""
