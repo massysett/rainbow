@@ -69,16 +69,12 @@ visualTest
   -> String
   -- ^ Name of executable
   -> Section
-visualTest fl libMods nm = executable nm $
-  [ mainIs (nm ++ ".hs")
-  , condBlock (flag fl)
-    ( buildable True
-    , [ otherModules libMods
-      , hsSourceDirs ["tests"]
-      ] ++ commonOptions
-    )
-    [ buildable False ]
+visualTest fl libMods nm = testSuite nm $
+  exitcodeFields (nm ++ ".hs") ++
+  [ otherModules libMods
+  , hsSourceDirs ["tests"]
   ]
+  ++ commonOptions
 
 main :: IO ()
 main = defaultMain $ do

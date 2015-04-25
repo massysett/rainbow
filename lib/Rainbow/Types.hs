@@ -149,7 +149,7 @@ makeLenses ''Chunk
 data Radiant = Radiant
   { _color8 :: Color Enum8
   , _color256 :: Color Word8
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Ord, Show, Typeable, Generic)
 
 -- | Uses the underlying 'Monoid' instance for the 'Color's.  Thus the
 -- last non-'Nothing' 'Color' is used.  This can be useful to specify

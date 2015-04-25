@@ -1,36 +1,35 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Control.Arrow (second)
 import Rainbow
 import qualified Data.ByteString as BS
 
-effects :: [(Text, Chunk)]
+effects :: [(String, Chunk a -> Chunk a)]
 effects =
-  [ ("bold", bold8)
-  , ("faint", faint8)
-  , ("italic", italic8)
-  , ("underline", underline8)
-  , ("blink", blink8)
-  , ("inverse", inverse8)
-  , ("invisible", invisible8)
-  , ("strikeout", strikeout8)
+  [ ("bold", bold)
+  , ("faint", faint)
+  , ("italic", italic)
+  , ("underline", underline)
+  , ("blink", blink)
+  , ("inverse", inverse)
+  , ("invisible", invisible)
+  , ("strikeout", strikeout)
   ]
 
-colors :: [(Text, Color8)]
+colors :: [(String, Radiant)]
 colors =
-  [ ("(no color)", noColor8)
-  , ("black", black8)
-  , ("red", red8)
-  , ("green", green8)
-  , ("yellow", yellow8)
-  , ("blue", blue8)
-  , ("magenta", magenta8)
-  , ("cyan", cyan8)
-  , ("white", white8)
+  [ ("(no color)", mempty)
+  , ("black", black)
+  , ("red", red)
+  , ("green", green)
+  , ("yellow", yellow)
+  , ("blue", blue)
+  , ("magenta", magenta)
+  , ("cyan", cyan)
+  , ("white", white)
   ]
 
-maybeEffects :: [(Text, Maybe Chunk)]
+maybeEffects :: [(String, Maybe (Chunk a -> Chunk a))]
 maybeEffects = ("(no effect)", Nothing)
   : map (second Just) effects
 
@@ -47,19 +46,22 @@ combinations k xs = combinations' (length xs) k xs
                             ++ combinations' (n - 1) k' ys 
 -}
 
-colorsAndEffects :: [Chunk]
+colorsAndEffects :: [[Chunk String]]
 colorsAndEffects = do
   (fgColorName, fgColor) <- colors
   (bgColorName, bgColor) <- colors
   (effectName, mayEffect) <- maybeEffects
-  let lbl = "foreground " <> fgColorName <> " background " <> bgColorName
-          <> " effect " <> effectName
-  return $ chunkFromText lbl <> fore fgColor
-         <> back bgColor
-         <> maybe mempty id mayEffect
-         <> chunkFromText "\n"
+  let lbl = "foreground " ++ fgColorName ++ " background " ++ bgColorName
+          ++ " effect " ++ effectName
+  return $ [ chunk lbl & fore fgColor
+             & back bgColor
+             & maybe id id mayEffect
+           , chunk "\n"
+           ]
 
 main :: IO ()
-main = do
-  mapM_ BS.putStr . chunksToByteStrings toByteStringsColors8
-    $ colorsAndEffects
+main
+  = mapM_ BS.putStr
+  . chunksToByteStrings toByteStringsColors8
+  . concat
+  $ colorsAndEffects

@@ -15,11 +15,14 @@ module Rainbow.QuickCheck where
 
 import Control.Applicative
 import Test.QuickCheck
-import Rainbow.Colors
 import Rainbow.Types
-import Data.Monoid
-import Control.Monad
-import qualified Data.Text as X
+
+instance Arbitrary a => Arbitrary (Color a) where
+  arbitrary = Color <$> arbitrary
+  shrink = genericShrink
+
+instance CoArbitrary a => CoArbitrary (Color a) where
+  coarbitrary (Color a) = coarbitrary a
 
 varInt :: Int -> Gen b -> Gen b
 varInt = variant
@@ -39,51 +42,15 @@ instance CoArbitrary Enum8 where
     E6 -> varInt 6
     E7 -> varInt 7
 
-instance Arbitrary Color8 where
-  arbitrary = fmap Color8 arbitrary
-  shrink = genericShrink
-
-instance CoArbitrary Color8 where
-  coarbitrary (Color8 Nothing) = varInt 0
-  coarbitrary (Color8 (Just e)) = varInt 1 . coarbitrary e
-
-instance Arbitrary Color256 where
-  arbitrary = fmap Color256 arbitrary
-  shrink = genericShrink
-
-instance CoArbitrary Color256 where
-  coarbitrary (Color256 Nothing) = varInt 0
-  coarbitrary (Color256 (Just w)) = varInt 1 . coarbitrary w
-
-instance Arbitrary (Last Color8) where
-  arbitrary = fmap Last arbitrary
-
-instance CoArbitrary (Last Color8) where
-  coarbitrary (Last Nothing) = varInt 0
-  coarbitrary (Last (Just c)) = varInt 1 . coarbitrary c
-
-instance Arbitrary (Last Color256) where
-  arbitrary = fmap Last arbitrary
-
-instance CoArbitrary (Last Color256) where
-  coarbitrary (Last Nothing) = varInt 0
-  coarbitrary (Last (Just c)) = varInt 1 . coarbitrary c
-
-instance Arbitrary (Last Bool) where
-  arbitrary = fmap Last arbitrary
-
-instance CoArbitrary (Last Bool) where
-  coarbitrary (Last Nothing) = varInt 0
-  coarbitrary (Last (Just b)) = varInt 1 . coarbitrary b
-
-instance Arbitrary StyleCommon where
+instance Arbitrary Format where
   arbitrary
-    = StyleCommon <$> g <*> g <*> g <*> g <*> g <*> g <*> g <*> g
+    = Format <$> g <*> g <*> g <*> g <*> g <*> g <*> g <*> g
     where
-      g = fmap Last arbitrary
+      g = arbitrary
+  shrink = genericShrink
 
-instance CoArbitrary StyleCommon where
-  coarbitrary (StyleCommon x0 x1 x2 x3 x4 x5 x6 x7)
+instance CoArbitrary Format where
+  coarbitrary (Format x0 x1 x2 x3 x4 x5 x6 x7)
     = coarbitrary x0
     . coarbitrary x1
     . coarbitrary x2
@@ -92,53 +59,32 @@ instance CoArbitrary StyleCommon where
     . coarbitrary x5
     . coarbitrary x6
     . coarbitrary x7
-    
 
-instance Arbitrary Style256 where
-  arbitrary = liftM3 Style256 arbitrary arbitrary arbitrary
-
-instance CoArbitrary Style256 where
-  coarbitrary (Style256 x0 x1 x2)
-    = coarbitrary x0
-    . coarbitrary x1
-    . coarbitrary x2
-
-instance Arbitrary Style8 where
-  arbitrary = liftM3 Style8 arbitrary arbitrary arbitrary
-
-instance CoArbitrary Style8 where
-  coarbitrary (Style8 x0 x1 x2)
-    = coarbitrary x0
-    . coarbitrary x1
-    . coarbitrary x2
-
-instance Arbitrary TextSpec where
-  arbitrary = liftM2 TextSpec arbitrary arbitrary
+instance Arbitrary a => Arbitrary (Style a) where
+  arbitrary = Style <$> arbitrary <*> arbitrary <*> arbitrary
   shrink = genericShrink
 
-instance CoArbitrary TextSpec where
-  coarbitrary (TextSpec x0 x1)
-    = coarbitrary x0
-    . coarbitrary x1
+instance CoArbitrary a => CoArbitrary (Style a) where
+  coarbitrary (Style a b c)
+    = coarbitrary a
+    . coarbitrary b
+    . coarbitrary c
 
-instance Arbitrary X.Text where
-  arbitrary = fmap X.pack arbitrary
-  shrink = map X.pack . shrink . X.unpack
 
-instance Arbitrary Chunk where
-  arbitrary = liftM2 Chunk arbitrary
-    (listOf (fmap X.pack (listOf (elements ['a'..'z']))))
+instance Arbitrary a => Arbitrary (Chunk a) where
+  arbitrary = Chunk <$> arbitrary <*> arbitrary <*> arbitrary
   shrink = genericShrink
 
-instance CoArbitrary Chunk where
-  coarbitrary (Chunk ts txts) = coarbitrary ts
-    . coarbitrary (map X.unpack txts)
+instance CoArbitrary a => CoArbitrary (Chunk a) where
+  coarbitrary (Chunk a b c)
+    = coarbitrary a
+    . coarbitrary b
+    . coarbitrary c
 
 instance Arbitrary Radiant where
-  arbitrary = liftM2 Radiant arbitrary arbitrary
+  arbitrary = Radiant <$> arbitrary <*> arbitrary
   shrink = genericShrink
 
 instance CoArbitrary Radiant where
-  coarbitrary (Radiant x0 x1)
-    = coarbitrary x0
-    . coarbitrary x1
+  coarbitrary (Radiant a b) = coarbitrary a . coarbitrary b
+
