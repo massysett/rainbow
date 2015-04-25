@@ -145,6 +145,8 @@ instance Blank a => Blank (Chunk a) where
 makeLenses ''Chunk
 
 
+-- | Stores colors that may affect 8-color terminals, 256-color
+-- terminals, both, or neither.
 data Radiant = Radiant
   { _color8 :: Color Enum8
   , _color256 :: Color Word8

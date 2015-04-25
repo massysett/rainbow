@@ -10,17 +10,15 @@
 -- | Rainbow handles colors and special effects for text.
 
 module Rainbow
-  ( -- * Colors
-    Y.Radiant
-  , fore
-  , back
-
-
+  (
   -- * Chunk
-  , Y.Chunk
+    Y.Chunk
   , Y.chunk
 
   -- * Formatting, all terminals
+
+  -- | These combinators affect the way a 'Y.Chunk' is displayed on
+  -- both 8- and 256-color terminals.
   , bold
   , faint
   , italic
@@ -29,6 +27,37 @@ module Rainbow
   , inverse
   , invisible
   , strikeout
+
+  -- * Colors
+  , Y.Radiant
+  , fore
+  , back
+
+  -- * Colors, all terminals
+
+  -- | These 'Y.Radiant' affect the way a 'Y.Chunk' is displayed on
+  -- both 8- and 256-color terminals.
+  , black
+  , red
+  , green
+  , yellow
+  , blue
+  , magenta
+  , cyan
+  , white
+
+  -- * Colors, 256-color terminals only
+
+  -- | These 'Y.Radiant' affect 256-color terminals only.
+  , grey
+  , brightRed
+  , brightGreen
+  , brightYellow
+  , brightBlue
+  , brightMagenta
+  , brightCyan
+  , brightWhite
+  , color256
 
   -- * Converting 'Chunk' to 'Data.ByteString.ByteString'
 
@@ -64,17 +93,36 @@ module Rainbow
   -- throwaway uses like experimenting in GHCi.
   , T.putChunk
   , T.putChunkLn
+
+  -- * Re-exports
+  -- $reexports
+  , module Data.Word
+  , module Data.ByteString
+
+  -- * Notes on terminals
+  -- $termNotes
+
   ) where
 
 import qualified Rainbow.Translate as T
 import qualified Rainbow.Types as Y
 import Data.Word (Word8)
+import Data.ByteString (ByteString)
 import Control.Lens
 
 formatBoth :: Setter' Y.Format Bool -> Y.Chunk a -> Y.Chunk a
 formatBoth get c = c & Y.style8 . Y.format . get .~ True
   & Y.style256 . Y.format . get .~ True
 
+-- | Bold. What actually happens when you use Bold is going to depend
+-- on your terminal. For example, xterm allows you actually use a bold
+-- font for bold, if you have one. Otherwise, it might simulate bold
+-- by using overstriking. Another possibility is that your terminal
+-- might use a different color to indicate bold. For more details (at
+-- least for xterm), look at xterm (1) and search for @boldColors@.
+--
+-- If your terminal uses a different color for bold, this allows an
+-- 8-color terminal to really have 16 colors.
 bold :: Y.Chunk a -> Y.Chunk a
 bold = formatBoth Y.bold
 
@@ -99,163 +147,69 @@ invisible = formatBoth Y.invisible
 strikeout :: Y.Chunk a -> Y.Chunk a
 strikeout = formatBoth Y.strikeout
 
-fore :: Radiant -> Y.Chunk a -> Y.Chunk a
-fore (Radiant c8 c256) c = c & Y.style8 . Y.fore .~ c8
+-- | Change the foreground color.  Whether this affects 8-color
+-- terminals, 256-color terminals, or both depends on the 'Y.Radiant'.
+fore :: Y.Radiant -> Y.Chunk a -> Y.Chunk a
+fore (Y.Radiant c8 c256) c = c & Y.style8 . Y.fore .~ c8
   & Y.style256 . Y.fore .~ c256
 
-back :: Radiant -> Y.Chunk a -> Y.Chunk a
-back (Radiant c8 c256) c = c & Y.style8 . Y.back .~ c8
+-- | Change the background color.  Whether this affects 8-color
+-- terminals, 256-color terminals, or both depends on the 'Y.Radiant'.
+back :: Y.Radiant -> Y.Chunk a -> Y.Chunk a
+back (Y.Radiant c8 c256) c = c & Y.style8 . Y.back .~ c8
   & Y.style256 . Y.back .~ c256
 
-{-
-  (
+black :: Y.Radiant
+black = Y.Radiant (Y.Color (Just Y.E0)) (Y.Color (Just 0))
 
-  -- * Chunks
-    Chunk
-  , chunkFromText
-  , chunkFromTexts
-  , chunkFromLazyText
-  , chunkFromLazyTexts
+red :: Y.Radiant
+red = Y.Radiant (Y.Color (Just Y.E1)) (Y.Color (Just 1))
 
-  -- * Effects for both 8 and 256 color terminals
+green :: Y.Radiant
+green = Y.Radiant (Y.Color (Just Y.E2)) (Y.Color (Just 2))
 
-  -- | These 'Chunk's affect both 8 and 256 color terminals:
-  --
-  -- @
-  -- 'putChunkLn' $ \"bold on 8 and 256 color terminals\" \<> 'bold'
-  -- @
+yellow :: Y.Radiant
+yellow = Y.Radiant (Y.Color (Just Y.E3)) (Y.Color (Just 3))
 
-  , bold
-  , faint
-  , italic
-  , underline
-  , blink
-  , inverse
-  , invisible
-  , strikeout
+blue :: Y.Radiant
+blue = Y.Radiant (Y.Color (Just Y.E4)) (Y.Color (Just 4))
 
-  -- * Effects for 8-color terminals only
+magenta :: Y.Radiant
+magenta = Y.Radiant (Y.Color (Just Y.E5)) (Y.Color (Just 5))
 
-  -- | These 'Chunk's affect 8-color terminals only.
-  --
-  -- @
-  -- 'putChunkLn' $ \"Bold on 8 color terminal only\" \<> 'bold8'
-  -- @
+cyan :: Y.Radiant
+cyan = Y.Radiant (Y.Color (Just Y.E6)) (Y.Color (Just 6))
 
-  , bold8
-  , faint8
-  , italic8
-  , underline8
-  , blink8
-  , inverse8
-  , invisible8
-  , strikeout8
+white :: Y.Radiant
+white = Y.Radiant (Y.Color (Just Y.E7)) (Y.Color (Just 7))
 
-  -- * Effects for 256-color terminals only
+grey :: Y.Radiant
+grey = color256 8
 
-  -- | These 'Chunk's affect 256-color terminals only.
-  --
-  -- @
-  -- 'putChunkLn' $ \"Underlined on 256-color terminal, \"
-  --              \<> \"bold on 8-color terminal\"
-  --              \<> 'underline256' \<> 'bold8'
-  -- @
+brightRed :: Y.Radiant
+brightRed = color256 9
 
-  , bold256
-  , faint256
-  , italic256
-  , underline256
-  , blink256
-  , inverse256
-  , invisible256
-  , strikeout256
+brightGreen :: Y.Radiant
+brightGreen = color256 10
 
-  -- * Colors
+brightYellow :: Y.Radiant
+brightYellow = color256 11
 
-  -- ** Changing the foreground and background color
-  , Color(..)
+brightBlue :: Y.Radiant
+brightBlue = color256 12
 
-  -- ** Colors for both 8- and 256-color terminals
-  , Radiant(..)
-  , noColorRadiant
-  , both
-  , black
-  , red
-  , green
-  , yellow
-  , blue
-  , magenta
-  , cyan
-  , white
+brightMagenta :: Y.Radiant
+brightMagenta = color256 13
 
+brightCyan :: Y.Radiant
+brightCyan = color256 14
 
-  -- ** Colors for 8-color terminals only
-  , Enum8(..)
-  , Color8(..)
-  , noColor8
-  , black8
-  , red8
-  , green8
-  , yellow8
-  , blue8
-  , magenta8
-  , cyan8
-  , white8
+brightWhite :: Y.Radiant
+brightWhite = color256 15
 
-  -- ** Colors for 256-color terminals only
-  , Color256(..)
-  , noColor256
-  , grey
-  , brightRed
-  , brightGreen
-  , brightYellow
-  , brightBlue
-  , brightMagenta
-  , brightCyan
-  , brightWhite
-  , to256
+color256 :: Word8 -> Y.Radiant
+color256 x = Y.Radiant (Y.Color Nothing) (Y.Color (Just x))
 
-  , byteStringMakerFromEnvironment
-  , byteStringMakerFromHandle
-  , toByteStringsColors0
-  , toByteStringsColors8
-  , toByteStringsColors256
-  , chunksToByteStrings
-
-  , putChunk
-  , putChunkLn
-
-  -- * Re-exports
-  -- $reexports
-  -- | * "Data.Monoid" re-exports '<>' and 'mempty'
-  --
-  -- 
-  , module Data.Monoid
-  , module Data.ByteString
-  , module Data.Text
-  , module Data.Word
-
-  -- * Notes on terminals
-  -- $termNotes
-
-  ) where
-
-import Rainbow.Types
-import Rainbow.Colors
-import Rainbow.Translate
-  ( byteStringMakerFromEnvironment
-  , byteStringMakerFromHandle
-  , toByteStringsColors0
-  , toByteStringsColors8
-  , toByteStringsColors256
-  , chunksToByteStrings
-  , putChunk
-  , putChunkLn
-  )
-import Data.Monoid (Monoid, (<>), mempty)
-import Data.Text (Text)
-import Data.ByteString (ByteString)
-import Data.Word (Word8)
 
 {- $reexports
 
@@ -325,5 +279,4 @@ Terminfo altogether.
 Apparently it's difficult to get ISO 6429 support on Microsoft
 Windows.  Oh well.
 
--}
 -}
