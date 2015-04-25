@@ -3,22 +3,23 @@
              FlexibleInstances, TypeFamilies,
              MultiParamTypeClasses #-}
 
--- | The innards of Rainbow.  Ordinarily you should not need this
--- module; instead, just import "Rainbow", which
--- re-exports the most useful names from this module.
-
+-- | All the main types in Rainbow.  Using this module you can specify
+-- that you want different formatting for 8- and 256-color terminals.
+-- Many of the names in this module conflict with the names in
+-- "Rainbow", so it's probably best to @import@ this module
+-- @qualified@.
 module Rainbow.Types where
 
 -- # Imports
 
+import Control.Lens
+import Data.Foldable ()
+import Data.Foldable (Foldable)
+import Data.Monoid
+import Data.Traversable ()
+import Data.Typeable
 import Data.Word (Word8)
 import GHC.Generics
-import Data.Typeable
-import Data.Foldable ()
-import Data.Traversable ()
-import Data.Monoid
-import Control.Lens
-import Data.Foldable (Foldable)
 
 --
 -- Colors
@@ -136,6 +137,7 @@ instance Monoid a => Monoid (Chunk a) where
   mappend (Chunk x0 x1 x2) (Chunk y0 y1 y2)
     = Chunk (x0 <> y0) (x1 <> y1) (x2 <> y2)
 
+-- | Creates a 'Chunk' with no formatting and with the given text.
 chunk :: a -> Chunk a
 chunk = Chunk mempty mempty
 
@@ -149,7 +151,10 @@ data Radiant = Radiant
   , _color256 :: Color Word8
   } deriving (Eq, Ord, Show)
 
--- | Uses the underlying 'Monoid' instance for the 'Color's.
+-- | Uses the underlying 'Monoid' instance for the 'Color's.  Thus the
+-- last non-'Nothing' 'Color' is used.  This can be useful to specify
+-- one color for 8-color terminals and a different color for 256-color
+-- terminals.
 instance Monoid Radiant where
   mempty = Radiant mempty mempty
   mappend (Radiant x0 x1) (Radiant y0 y1) = Radiant (x0 <> y0) (x1 <> y1)

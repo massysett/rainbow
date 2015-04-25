@@ -7,7 +7,64 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
--- | Rainbow handles colors and special effects for text.
+-- | Rainbow handles colors and special effects for text.  The basic
+-- building block of Rainbow is the 'Y.Chunk'.  The 'Y.Chunk' contains
+-- both text and formatting information such as colors, bold,
+-- underlining, etc.
+--
+-- When printed, each 'Y.Chunk' starts off with a clean slate, so if
+-- you want special formatting such as any color, bold, etc, then you
+-- must specify it for every 'Y.Chunk'.  The appearance of one
+-- 'Y.Chunk' does not affect the appearance of the next 'Y.Chunk'.
+-- This makes it easy to reason about how a particular 'Y.Chunk' will
+-- look.
+--
+-- Rainbow supports 256-color terminals.  You have full freedom to
+-- specify different attributes and colors for 8 and 256 color
+-- terminals; for instance, you can have text appear red on an 8-color
+-- terminal but blue on a 256-color terminal.
+--
+-- Here are some basic examples:
+--
+-- @
+-- 'T.putChunkLn' $ 'Y.chunk' \"Some blue text\" '&' 'fore' 'blue'
+-- 'T.putChunkLn' $ 'Y.chunk' \"Blue on red background\"
+--               '&' 'fore' 'blue' '&' 'back' 'red'
+-- 'T.putChunkLn' $ 'Y.chunk' \"Blue on red, foreground bold\"
+--                '&' 'fore' 'blue' '&' 'back' 'red' '&' 'bold'
+-- @
+--
+-- You can also specify output for 256-color terminals. To use these
+-- examples, be sure your TERM environment variable is set to
+-- something that supports 256 colors (like @xterm-256color@) before
+-- you start GHCi.
+--
+-- @
+-- 'T.putChunkLn' $ 'Y.chunk' \"Blue on 8, bright green on 256\" '&'
+--    'fore' ('blue' '<>' 'brightGreen')
+--
+-- 'T.putChunkLn' $ 'Y.chunk' \"Blue on 8, red on 256" '&'
+--    'fore' ('blue' '<>' 'only256' 'red')
+-- @
+--
+-- Each 'Y.Chunk' affects the formatting only of that 'Y.Chunk'.  So
+-- to print things in different colors, make more than one 'Y.Chunk':
+--
+-- @
+-- 'mapM_' 'T.putChunkLn'
+--    [ 'Y.chunk' \"Roses\" '&' 'fore' 'red'
+--    , 'Y.chunk' \"Violets\" '&' 'fore' 'blue' ]
+-- @
+--
+-- The above examples use 'T.putChunkLn', but that function will
+-- be inefficient if you are printing many 'Y.Chunk's.  For
+-- greater efficiency see 'T.chunksToByteStrings'.
+--
+-- The functions in this module, "Rainbow", will likely be enough for
+-- most uses, but for more flexibility you can use "Rainbow.Types".
+-- Use of "Rainbow.Types" will require some familiarity with the
+-- @lens@ library.
+
 
 module Rainbow
   (
@@ -58,6 +115,7 @@ module Rainbow
   , brightCyan
   , brightWhite
   , color256
+  , only256
 
   -- * Converting 'Chunk' to 'Data.ByteString.ByteString'
 
@@ -96,8 +154,10 @@ module Rainbow
 
   -- * Re-exports
   -- $reexports
+  , module Control.Lens.Operators
   , module Data.Word
   , module Data.ByteString
+  , module Data.Monoid
 
   -- * Notes on terminals
   -- $termNotes
@@ -108,7 +168,9 @@ import qualified Rainbow.Translate as T
 import qualified Rainbow.Types as Y
 import Data.Word (Word8)
 import Data.ByteString (ByteString)
+import Control.Lens.Operators ((&))
 import Control.Lens
+import Data.Monoid (Monoid(mempty), (<>))
 
 formatBoth :: Setter' Y.Format Bool -> Y.Chunk a -> Y.Chunk a
 formatBoth get c = c & Y.style8 . Y.format . get .~ True
@@ -147,17 +209,26 @@ invisible = formatBoth Y.invisible
 strikeout :: Y.Chunk a -> Y.Chunk a
 strikeout = formatBoth Y.strikeout
 
--- | Change the foreground color.  Whether this affects 8-color
--- terminals, 256-color terminals, or both depends on the 'Y.Radiant'.
+-- | Change the foreground color for both 8- and 256-color terminals.
 fore :: Y.Radiant -> Y.Chunk a -> Y.Chunk a
 fore (Y.Radiant c8 c256) c = c & Y.style8 . Y.fore .~ c8
   & Y.style256 . Y.fore .~ c256
 
--- | Change the background color.  Whether this affects 8-color
--- terminals, 256-color terminals, or both depends on the 'Y.Radiant'.
+-- | Change the background color for both 8- and 256-color terminals.
 back :: Y.Radiant -> Y.Chunk a -> Y.Chunk a
 back (Y.Radiant c8 c256) c = c & Y.style8 . Y.back .~ c8
   & Y.style256 . Y.back .~ c256
+
+-- | Ensures that a 'Y.Radiant' affects only a 256-color terminal.
+-- For instance, to make text that is blue on an 8-color terminal but
+-- red on a 256-color terminal:
+--
+-- @
+-- 'T.putChunkLn' $ 'chunk' \"Blue on 8, red on 256" &
+--    'fore' ('blue' <> 'only256' 'red')
+-- @
+only256 :: Y.Radiant -> Y.Radiant
+only256 r = r & Y.color8 . _Wrapped .~ Nothing
 
 black :: Y.Radiant
 black = Y.Radiant (Y.Color (Just Y.E0)) (Y.Color (Just 0))
@@ -213,13 +284,14 @@ color256 x = Y.Radiant (Y.Color Nothing) (Y.Color (Just x))
 
 {- $reexports
 
+   * "Control.Lens.Operators" re-exports '&'
+
    * "Data.Monoid" re-exports 'Monoid', '<>' and 'mempty'
 
    * "Data.ByteString" re-exports 'ByteString'
 
-   * "Data.Text" re-exports 'Text'
-
    * "Data.Word" re-exports 'Word8'
+
 -}
 
 {- $termNotes

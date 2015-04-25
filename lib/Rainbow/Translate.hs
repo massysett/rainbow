@@ -1,4 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
+
+-- | This module contains functions that convert a 'T.Chunk' into
+-- 'ByteString's.  Ordinarily everything you need from this module is
+-- exported from "Rainbow".
 module Rainbow.Translate where
 
 import qualified Data.ByteString.Char8 as BS8
@@ -23,7 +27,7 @@ import qualified System.IO as IO
 class Renderable a where
   render :: a -> [ByteString] -> [ByteString]
 
--- | Convers a strict Text to a UTF-8 ByteString.
+-- | Converts a strict Text to a UTF-8 ByteString.
 instance Renderable X.Text where
   render x = (X.encodeUtf8 x :)
 
