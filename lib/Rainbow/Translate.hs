@@ -18,6 +18,8 @@ import Control.Monad
 import Control.Exception
 import qualified System.IO as IO
 
+
+-- | Items that can be rendered.  'render' returns a difference list.
 class Renderable a where
   render :: a -> [ByteString] -> [ByteString]
 

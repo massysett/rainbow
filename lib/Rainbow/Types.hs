@@ -16,51 +16,32 @@ import GHC.Generics
 import Data.Typeable
 import Data.Foldable ()
 import Data.Traversable ()
+import Data.Monoid
 import Control.Lens
 import Data.Foldable (Foldable)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as BSL
-import qualified Data.Text as X
-import qualified Data.Text.Lazy as XL
-
---
--- Blank
---
-
--- | Something is Blank if, upon rendering, it has no visible effect
--- on the terminal.
-class Blank a where
-  blank :: a
-
-instance Blank String where
-  blank = ""
-
-instance Blank BS.ByteString where
-  blank = BS.empty
-
-instance Blank BSL.ByteString where
-  blank = BSL.empty
-
-instance Blank X.Text where
-  blank = X.empty
-
-instance Blank XL.Text where
-  blank = XL.empty
 
 --
 -- Colors
 --
 
+-- | A color; a 'Nothing' value means that the terminal's default
+-- color is used.  The type of the 'Maybe' generally will be an
+-- 'Enum8' to represent one of 8 colors, or a 'Word8' to represent one
+-- of 256 colors.
 newtype Color a = Color (Maybe a)
   deriving (Eq, Show, Ord, Generic, Typeable, Functor, Foldable,
             Traversable)
 
 makeWrapped ''Color
 
-instance Blank (Color a) where
-  blank = Color Nothing
+-- | Takes the last non-Nothing Color.  'mempty' is no color.
+instance Monoid (Color a) where
+  mempty = Color Nothing
+  mappend (Color x) (Color y) = case y of
+    Just a -> Color (Just a)
+    _ -> Color x
 
--- | A simple enumeration for eight values.
+-- | A simple enumeration for eight values.  Represents eight colors.
 data Enum8
   = E0
   | E1
@@ -87,10 +68,7 @@ enum8toWord8 e = case e of
 -- Styles
 --
 
--- | Style elements that apply in both 8 and 256 color
--- terminals. However, the elements are described separately for 8 and
--- 256 color terminals, so that the text appearance can change
--- depending on how many colors a terminal has.
+-- | Text formatting such as bold, italic, etc.
 data Format = Format
   { _bold :: Bool
   , _faint :: Bool
@@ -104,9 +82,18 @@ data Format = Format
 
 makeLenses ''Format
 
-instance Blank Format where
-  blank = Format False False False False False False False False
+-- | For each field, the resulting field is True if either field is
+-- True.  For 'mempty', every field is False.
+instance Monoid Format where
+  mempty = Format False False False False False False False False
+  mappend (Format x0 x1 x2 x3 x4 x5 x6 x7)
+          (Format y0 y1 y2 y3 y4 y5 y6 y7)
+    = Format (x0 || y0) (x1 || y1) (x2 || y2) (x3 || y3) (x4 || y4)
+             (x5 || y5) (x6 || y6) (x7 || y7)
 
+-- | The foreground and background color, and the 'Format'.  This
+-- represents all colors and formatting attributes for either an 8- or
+-- 256-color terminal.
 data Style a = Style
   { _fore :: Color a
   , _back :: Color a
@@ -116,8 +103,11 @@ data Style a = Style
 
 makeLenses ''Style
 
-instance Blank (Style a) where
-  blank = Style blank blank blank
+-- | Uses the underlying 'Monoid' instances for 'Color' and 'Format'.
+instance Monoid (Style a) where
+  mempty = Style mempty mempty mempty
+  mappend (Style x0 x1 x2) (Style y0 y1 y2)
+    = Style (x0 <> y0) (x1 <> y1) (x2 <> y2)
 
 --
 -- Chunks
@@ -136,11 +126,18 @@ data Chunk a = Chunk
   } deriving (Eq, Show, Ord, Generic, Typeable, Functor,
               Foldable, Traversable)
 
-chunk :: a -> Chunk a
-chunk = Chunk blank blank
+-- | Uses the underlying 'Monoid' instances for the 'Style' and for
+-- the particular '_yarn'.  Therefore 'mempty' will have no formatting
+-- and no colors and will generally have no text, though whether or
+-- not there is any text depends on the 'mempty' for the type of the
+-- '_yarn'.
+instance Monoid a => Monoid (Chunk a) where
+  mempty = Chunk mempty mempty mempty
+  mappend (Chunk x0 x1 x2) (Chunk y0 y1 y2)
+    = Chunk (x0 <> y0) (x1 <> y1) (x2 <> y2)
 
-instance Blank a => Blank (Chunk a) where
-  blank = Chunk blank blank blank
+chunk :: a -> Chunk a
+chunk = Chunk mempty mempty
 
 makeLenses ''Chunk
 
@@ -151,6 +148,11 @@ data Radiant = Radiant
   { _color8 :: Color Enum8
   , _color256 :: Color Word8
   } deriving (Eq, Ord, Show)
+
+-- | Uses the underlying 'Monoid' instance for the 'Color's.
+instance Monoid Radiant where
+  mempty = Radiant mempty mempty
+  mappend (Radiant x0 x1) (Radiant y0 y1) = Radiant (x0 <> y0) (x1 <> y1)
 
 makeLenses ''Radiant
 
