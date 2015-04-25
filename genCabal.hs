@@ -5,7 +5,7 @@
 import Cartel
 
 rainbowVersion :: [Word]
-rainbowVersion = [0,22,0,2]
+rainbowVersion = [0,24,0,0]
 
 -- Dependencies
 
@@ -25,7 +25,7 @@ process :: Package
 process = closedOpen "process" [1,2] [1,3]
 
 lens :: Package
-lens = closedOpen "lens" [4,9,1] [4,10]
+lens = closedOpen "lens" [4,7] [4,10]
 
 commonOptions :: HasBuildInfo a => [a]
 commonOptions =

@@ -299,14 +299,14 @@ byteStringMakerFromHandle h = IO.hIsTerminalDevice h >>= f
 -- So, for example, to print a bunch of chunks to standard output
 -- using 256 colors:
 --
--- > {-# LANGUAGE OverloadedStrings #-}
 -- > module PrintMyChunks where
 -- >
 -- > import qualified Data.ByteString as BS
 -- > import Rainbow
 -- >
--- > myChunks :: [Chunk]
--- > myChunks = [ "Roses" <> fore red, "\n", "Violets" <> fore blue, "\n" ]
+-- > myChunks :: [Chunk String]
+-- > myChunks = [ chunk "Roses" & fore red, chunk "\n",
+-- >              chunk "Violets" & fore blue, chunk "\n" ]
 -- >
 -- > myPrintedChunks :: IO ()
 -- > myPrintedChunks = mapM_ BS.putStr
