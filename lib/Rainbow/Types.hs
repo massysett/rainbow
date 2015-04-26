@@ -65,6 +65,54 @@ enum8toWord8 e = case e of
   E6 -> 6
   E7 -> 7
 
+black :: Enum8
+black = E0
+
+red :: Enum8
+red = E1
+
+green :: Enum8
+green = E2
+
+yellow :: Enum8
+yellow = E3
+
+blue :: Enum8
+blue = E4
+
+magenta :: Enum8
+magenta = E5
+
+cyan :: Enum8
+cyan = E6
+
+white :: Enum8
+white = E7
+
+grey :: Word8
+grey = 8
+
+brightRed :: Word8
+brightRed = 9
+
+brightGreen :: Word8
+brightGreen = 10
+
+brightYellow :: Word8
+brightYellow = 11
+
+brightBlue :: Word8
+brightBlue = 12
+
+brightMagenta :: Word8
+brightMagenta = 13
+
+brightCyan :: Word8
+brightCyan = 14
+
+brightWhite :: Word8
+brightWhite = 15
+
 --
 -- Styles
 --
@@ -111,6 +159,22 @@ instance Monoid (Style a) where
     = Style (x0 <> y0) (x1 <> y1) (x2 <> y2)
 
 --
+-- Scheme
+--
+
+-- | Holds the 'Style' for both 8- and 256-color terminals.
+data Scheme = Scheme
+  { _style8 :: Style Enum8
+  , _style256 :: Style Word8
+  } deriving (Eq, Ord, Show, Generic, Typeable)
+
+makeLenses ''Scheme
+
+instance Monoid Scheme where
+  mempty = Scheme mempty mempty
+  mappend (Scheme x0 x1) (Scheme y0 y1) = Scheme (x0 <> y0) (x1 <> y1)
+
+--
 -- Chunks
 --
 
@@ -121,8 +185,7 @@ instance Monoid (Style a) where
 -- a 256 color terminal.
 
 data Chunk a = Chunk
-  { _style8 :: Style Enum8
-  , _style256 :: Style Word8
+  { _scheme :: Scheme
   , _yarn :: a
   } deriving (Eq, Show, Ord, Generic, Typeable, Functor,
               Foldable, Traversable)
@@ -133,13 +196,13 @@ data Chunk a = Chunk
 -- not there is any text depends on the 'mempty' for the type of the
 -- '_yarn'.
 instance Monoid a => Monoid (Chunk a) where
-  mempty = Chunk mempty mempty mempty
-  mappend (Chunk x0 x1 x2) (Chunk y0 y1 y2)
-    = Chunk (x0 <> y0) (x1 <> y1) (x2 <> y2)
+  mempty = Chunk mempty mempty
+  mappend (Chunk x0 x1) (Chunk y0 y1)
+    = Chunk (x0 <> y0) (x1 <> y1)
 
 -- | Creates a 'Chunk' with no formatting and with the given text.
 chunk :: a -> Chunk a
-chunk = Chunk mempty mempty
+chunk = Chunk mempty
 
 makeLenses ''Chunk
 

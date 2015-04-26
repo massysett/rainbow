@@ -173,8 +173,8 @@ import Control.Lens
 import Data.Monoid (Monoid(mempty), (<>))
 
 formatBoth :: Setter' Y.Format Bool -> Y.Chunk a -> Y.Chunk a
-formatBoth get c = c & Y.style8 . Y.format . get .~ True
-  & Y.style256 . Y.format . get .~ True
+formatBoth get c = c & Y.scheme . Y.style8 . Y.format . get .~ True
+  & Y.scheme . Y.style256 . Y.format . get .~ True
 
 -- | Bold. What actually happens when you use Bold is going to depend
 -- on your terminal. For example, xterm allows you actually use a bold
@@ -211,13 +211,13 @@ strikeout = formatBoth Y.strikeout
 
 -- | Change the foreground color for both 8- and 256-color terminals.
 fore :: Y.Radiant -> Y.Chunk a -> Y.Chunk a
-fore (Y.Radiant c8 c256) c = c & Y.style8 . Y.fore .~ c8
-  & Y.style256 . Y.fore .~ c256
+fore (Y.Radiant c8 c256) c = c & Y.scheme . Y.style8 . Y.fore .~ c8
+  & Y.scheme . Y.style256 . Y.fore .~ c256
 
 -- | Change the background color for both 8- and 256-color terminals.
 back :: Y.Radiant -> Y.Chunk a -> Y.Chunk a
-back (Y.Radiant c8 c256) c = c & Y.style8 . Y.back .~ c8
-  & Y.style256 . Y.back .~ c256
+back (Y.Radiant c8 c256) c = c & Y.scheme . Y.style8 . Y.back .~ c8
+  & Y.scheme . Y.style256 . Y.back .~ c256
 
 -- | Ensures that a 'Y.Radiant' affects only a 256-color terminal.
 -- For instance, to make text that is blue on an 8-color terminal but

@@ -70,16 +70,22 @@ instance CoArbitrary a => CoArbitrary (Style a) where
     . coarbitrary b
     . coarbitrary c
 
+instance Arbitrary Scheme where
+  arbitrary = Scheme <$> arbitrary <*> arbitrary
+  shrink = genericShrink
+
+instance CoArbitrary Scheme where
+  coarbitrary (Scheme a b) = coarbitrary a . coarbitrary b
+
 
 instance Arbitrary a => Arbitrary (Chunk a) where
-  arbitrary = Chunk <$> arbitrary <*> arbitrary <*> arbitrary
+  arbitrary = Chunk <$> arbitrary <*> arbitrary
   shrink = genericShrink
 
 instance CoArbitrary a => CoArbitrary (Chunk a) where
-  coarbitrary (Chunk a b c)
+  coarbitrary (Chunk a b)
     = coarbitrary a
     . coarbitrary b
-    . coarbitrary c
 
 instance Arbitrary Radiant where
   arbitrary = Radiant <$> arbitrary <*> arbitrary

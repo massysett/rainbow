@@ -221,14 +221,14 @@ toByteStringsColors0
   => T.Chunk a
   -> [ByteString]
   -> [ByteString]
-toByteStringsColors0 (T.Chunk _ _ yn) = render yn
+toByteStringsColors0 (T.Chunk _ yn) = render yn
 
 toByteStringsColors8
   :: Renderable a
   => T.Chunk a
   -> [ByteString]
   -> [ByteString]
-toByteStringsColors8 (T.Chunk s8 _ yn)
+toByteStringsColors8 (T.Chunk (T.Scheme s8 _) yn)
   = normalDefault
   . renderStyle8 s8
   . render yn
@@ -239,7 +239,7 @@ toByteStringsColors256
   => T.Chunk a
   -> [ByteString]
   -> [ByteString]
-toByteStringsColors256 (T.Chunk _ s256 yn)
+toByteStringsColors256 (T.Chunk (T.Scheme _ s256) yn)
   = normalDefault
   . renderStyle256 s256
   . render yn
