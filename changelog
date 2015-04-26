@@ -1,6 +1,16 @@
 I don't keep the best changelogs.  Remember you can always go to
 hdiff.luite.com to compare different released versions.
 
+0.26.0.0
+
+  * add color names to Types module
+
+  * add Scheme
+
+0.24.0.0
+
+  * now uses Lenses; revamped API
+
 0.22.0.0
 
   * no longer uses Terminfo.  Some breaking changes in how Chunks
