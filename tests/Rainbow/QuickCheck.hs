@@ -16,8 +16,9 @@ module Rainbow.QuickCheck where
 import Control.Applicative
 import Test.QuickCheck
 import Rainbow.Types
+import Data.Typeable
 
-instance Arbitrary a => Arbitrary (Color a) where
+instance (Typeable a, Arbitrary a) => Arbitrary (Color a) where
   arbitrary = Color <$> arbitrary
   shrink = genericShrink
 
@@ -60,7 +61,7 @@ instance CoArbitrary Format where
     . coarbitrary x6
     . coarbitrary x7
 
-instance Arbitrary a => Arbitrary (Style a) where
+instance (Arbitrary a, Typeable a) => Arbitrary (Style a) where
   arbitrary = Style <$> arbitrary <*> arbitrary <*> arbitrary
   shrink = genericShrink
 
@@ -78,7 +79,7 @@ instance CoArbitrary Scheme where
   coarbitrary (Scheme a b) = coarbitrary a . coarbitrary b
 
 
-instance Arbitrary a => Arbitrary (Chunk a) where
+instance (Arbitrary a, Typeable a) => Arbitrary (Chunk a) where
   arbitrary = Chunk <$> arbitrary <*> arbitrary
   shrink = genericShrink
 
