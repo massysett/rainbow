@@ -1,6 +1,6 @@
 env:
-  - CABALVER=1.18 GHCVER=7.8.3
-  - CABALVER=1.22 GHCVER=7.10.1
+  - CABALVER=1.18 GHCVER=7.8.3 QUICKCHECK=2.7.*
+  - CABALVER=1.22 GHCVER=7.10.1 QUICKCHECK=2.8.*
 
 before_install:
  - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
@@ -16,7 +16,7 @@ install:
  - cabal install cartel packdeps
  - sh generate
  - packdeps rainbow.cabal
- - cabal install --only-dependencies --enable-tests --enable-benchmarks
+ - cabal install --only-dependencies --enable-tests --enable-benchmarks --constraint=QuickCheck==$QUICKCHECK
  - ghc-pkg list
 
 
