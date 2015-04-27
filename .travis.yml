@@ -16,7 +16,7 @@ install:
  - cabal install cartel packdeps
  - sh generate
  - packdeps rainbow.cabal
- - cabal install --only-dependencies --enable-tests --enable-benchmarks --constraint="QuickCheck==$QUICKCHECK"
+ - cabal install --only-dependencies --enable-tests --enable-benchmarks --constraint=QuickCheck==$QUICKCHECK
  - ghc-pkg list
 
 
