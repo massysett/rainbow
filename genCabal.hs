@@ -5,27 +5,27 @@
 import Cartel
 
 rainbowVersion :: [Word]
-rainbowVersion = [0,26,0,4]
+rainbowVersion = [0,26,0,6]
 
 -- Dependencies
 
 base :: Package
-base = closedOpen "base" [4,7,0,0] [4,9,0,0]
+base = closedOpen "base" [4,7,0,0] [5]
 
 text :: Package
-text = closedOpen "text" [0,11,2,0] [1,3,0,0]
+text = package "text" (gtEq [0,11,2,0])
 
 bytestring :: Package
-bytestring = closedOpen "bytestring" [0,10] [0,11]
+bytestring = package "bytestring" (gtEq [0,10])
 
 quickCheck :: Package
-quickCheck = closedOpen "QuickCheck" [2,7] [2,9]
+quickCheck = package "QuickCheck" (gtEq [2,7])
 
 process :: Package
-process = closedOpen "process" [1,2] [1,3]
+process = package "process" (gtEq [1,2])
 
 lens :: Package
-lens = closedOpen "lens" [4,7] [4,12]
+lens = package "lens" (gtEq [4,7])
 
 commonOptions :: HasBuildInfo a => [a]
 commonOptions =
@@ -58,7 +58,7 @@ properties = blank
     , "of how it should appear. Rainbow works with both 8-color and 256-color"
     , "terminals."
     ]
-  , testedWith = map (\ls -> (ghc, eq ls)) [[7,8,2], [7,10,1]]
+  , testedWith = map (\ls -> (ghc, eq ls)) [[7,10,1]]
   }
 
 visualTest
