@@ -12,14 +12,15 @@ module Rainbow.Types where
 
 -- # Imports
 
-import Control.Lens
-import Data.Foldable ()
-import Data.Foldable (Foldable)
-import Data.Monoid
-import Data.Traversable ()
-import Data.Typeable
-import Data.Word (Word8)
-import GHC.Generics
+import           Data.Foldable    ()
+import           Data.Foldable    (Foldable)
+import           Data.Monoid
+import           Data.Traversable ()
+import           Data.Typeable
+import           Data.Word        (Word8)
+import           GHC.Generics
+
+import           Lens.Simple
 
 --
 -- Colors
@@ -32,8 +33,6 @@ import GHC.Generics
 newtype Color a = Color (Maybe a)
   deriving (Eq, Show, Ord, Generic, Typeable, Functor, Foldable,
             Traversable)
-
-makeWrapped ''Color
 
 -- | Takes the last non-Nothing Color.  'mempty' is no color.
 instance Monoid (Color a) where
