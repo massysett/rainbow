@@ -1,7 +1,10 @@
 module Main where
 
-import Rainbow
 import qualified Data.ByteString as BS
+import           Rainbow
+
+import           Lens.Simple
+
 
 colors8 :: [(String, Radiant)]
 colors8 =

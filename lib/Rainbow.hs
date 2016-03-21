@@ -154,7 +154,6 @@ module Rainbow
 
   -- * Re-exports
   -- $reexports
-  , module Control.Lens.Operators
   , module Data.Word
   , module Data.ByteString
   , module Data.Monoid
@@ -164,13 +163,14 @@ module Rainbow
 
   ) where
 
+import           Data.ByteString   (ByteString)
+import           Data.Monoid       (Monoid (mempty), (<>))
+import           Data.Word         (Word8)
 import qualified Rainbow.Translate as T
-import qualified Rainbow.Types as Y
-import Data.Word (Word8)
-import Data.ByteString (ByteString)
-import Control.Lens.Operators ((&))
-import Control.Lens
-import Data.Monoid (Monoid(mempty), (<>))
+import qualified Rainbow.Types     as Y
+
+import           Lens.Simple
+
 
 formatBoth :: Setter' Y.Format Bool -> Y.Chunk a -> Y.Chunk a
 formatBoth get c = c & Y.scheme . Y.style8 . Y.format . get .~ True
@@ -228,7 +228,7 @@ back (Y.Radiant c8 c256) c = c & Y.scheme . Y.style8 . Y.back .~ c8
 --    'fore' ('blue' <> 'only256' 'red')
 -- @
 only256 :: Y.Radiant -> Y.Radiant
-only256 r = r & Y.color8 . _Wrapped .~ Nothing
+only256 r = r & Y.color8 .~ Y.Color Nothing
 
 black :: Y.Radiant
 black = Y.Radiant (Y.Color (Just Y.E0)) (Y.Color (Just 0))

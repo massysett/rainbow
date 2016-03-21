@@ -1,8 +1,10 @@
 module Main where
 
-import Control.Arrow (second)
-import Rainbow
+import           Control.Arrow   (second)
 import qualified Data.ByteString as BS
+import           Rainbow
+
+import           Lens.Simple
 
 effects :: [(String, Chunk a -> Chunk a)]
 effects =

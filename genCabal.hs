@@ -24,15 +24,15 @@ quickCheck = package "QuickCheck" (gtEq [2,7])
 process :: Package
 process = package "process" (gtEq [1,2])
 
-lens :: Package
-lens = package "lens" (gtEq [4,7])
+lensSimple :: Package
+lensSimple = package "lens-simple" (gtEq [0,1,0,8])
 
 commonOptions :: HasBuildInfo a => [a]
 commonOptions =
   [ haskell2010
   , ghcOptions ["-Wall"]
   , otherExtensions ["TemplateHaskell"]
-  , buildDepends [base, text, bytestring, process, lens]
+  , buildDepends [base, text, bytestring, process, lensSimple]
   , hsSourceDirs ["lib"]
   ]
 
