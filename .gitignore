@@ -3,3 +3,4 @@ dist/
 cabal.sandbox.config
 rainbow.cabal
 tests/rainbow-tests.cabal
+.stack-work/

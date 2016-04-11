@@ -1,6 +1,18 @@
 I don't keep the best changelogs.  Remember you can always go to
 hdiff.luite.com to compare different released versions.
 
+0.28.0.0
+
+  * removed dependency on lens and replaced it with microlens-th and
+  microlens.  This reduces the dependency graph a great deal.  I
+  went with microlens rather than lens-simple because lens-simple
+  ultimately depends on lens-family and lens-family2, and I do not
+  know offhand what the "2" means and this was an issue when trying
+  to figure out what Template Haskell functions to use (I know I can
+  find out, but I don't care.)  The only disadvantage of this is
+  that some types which used to have Wrapped instances no longer do.
+  Data.Coerce reduces a lot of the pain of this though.
+
 0.26.0.0
 
   * add color names to Types module

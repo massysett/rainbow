@@ -1,0 +1,5 @@
+#!/bin/sh
+
+mv stack.yaml stack-old.yaml
+stack --resolver=lts-5.12 runghc genCabal.hs --package cartel --install-ghc > rainbow.cabal
+mv stack-old.yaml stack.yaml

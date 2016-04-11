@@ -12,14 +12,14 @@ import qualified Data.Text as X
 import qualified Data.Text.Encoding as X
 import qualified Data.Text.Lazy as XL
 import Data.ByteString (ByteString)
-import Data.Word
+import Data.Word (Word8)
 import Data.List (intersperse)
 import qualified Rainbow.Types as T
-import System.Process
-import Text.Read
-import System.Exit
-import Control.Monad
-import Control.Exception
+import System.Process (readProcessWithExitCode)
+import Text.Read (readMaybe)
+import System.Exit (ExitCode(ExitFailure))
+import Control.Monad (mzero)
+import Control.Exception (try, IOException)
 import qualified System.IO as IO
 
 

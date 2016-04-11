@@ -1,7 +1,5 @@
 {-# LANGUAGE DeriveGeneric, DeriveDataTypeable, DeriveFunctor,
-             DeriveTraversable, DeriveFoldable, TemplateHaskell,
-             FlexibleInstances, TypeFamilies,
-             MultiParamTypeClasses #-}
+             DeriveTraversable, DeriveFoldable, TemplateHaskell #-}
 
 -- | All the main types in Rainbow.  Using this module you can specify
 -- that you want different formatting for 8- and 256-color terminals.
@@ -12,14 +10,12 @@ module Rainbow.Types where
 
 -- # Imports
 
-import Control.Lens
-import Data.Foldable ()
-import Data.Foldable (Foldable)
-import Data.Monoid
+import Lens.Micro.TH (makeLenses)
+import Data.Monoid ((<>))
 import Data.Traversable ()
-import Data.Typeable
+import Data.Typeable (Typeable)
 import Data.Word (Word8)
-import GHC.Generics
+import GHC.Generics (Generic)
 
 --
 -- Colors
@@ -33,7 +29,6 @@ newtype Color a = Color (Maybe a)
   deriving (Eq, Show, Ord, Generic, Typeable, Functor, Foldable,
             Traversable)
 
-makeWrapped ''Color
 
 -- | Takes the last non-Nothing Color.  'mempty' is no color.
 instance Monoid (Color a) where
