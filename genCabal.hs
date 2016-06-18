@@ -5,12 +5,12 @@
 import Cartel
 
 rainbowVersion :: [Word]
-rainbowVersion = [0,28,0,0]
+rainbowVersion = [0,28,0,2]
 
 -- Dependencies
 
 base :: Package
-base = closedOpen "base" [4,7,0,0] [5]
+base = closedOpen "base" [4,8] [5]
 
 text :: Package
 text = package "text" (gtEq [0,11,2,0])
@@ -44,7 +44,7 @@ properties :: Properties
 properties = blank
   { name = "rainbow"
   , version = rainbowVersion
-  , cabalVersion = Just (1,18)
+  , cabalVersion = Just (1,10)
   , buildType = Just simple
   , license = Just bsd3
   , licenseFile = "LICENSE"

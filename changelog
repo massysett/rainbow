@@ -1,6 +1,11 @@
 I don't keep the best changelogs.  Remember you can always go to
 hdiff.luite.com to compare different released versions.
 
+0.28.0.2
+
+  * Changed base dependency to version 4.8.  Also changed
+  cabal-version to 1.10.
+
 0.28.0.0
 
   * removed dependency on lens and replaced it with microlens-th and
