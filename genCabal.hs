@@ -5,7 +5,7 @@
 import Cartel
 
 rainbowVersion :: [Word]
-rainbowVersion = [0,28,0,2]
+rainbowVersion = [0,28,0,4]
 
 -- Dependencies
 
@@ -24,19 +24,15 @@ quickCheck = package "QuickCheck" (gtEq [2,7])
 process :: Package
 process = package "process" (gtEq [1,2])
 
-microlens :: Package
-microlens = package "microlens" (gtEq [0,4,2,1])
-
-microlensTh :: Package
-microlensTh = package "microlens-th" (gtEq [0,3,0,2])
+lensSimple :: Package
+lensSimple = package "lens-simple" (gtEq [0,1,0])
 
 commonOptions :: HasBuildInfo a => [a]
 commonOptions =
   [ haskell2010
   , ghcOptions ["-Wall"]
   , otherExtensions ["TemplateHaskell"]
-  , buildDepends [base, text, bytestring, process, microlens,
-                  microlensTh ]
+  , buildDepends [base, text, bytestring, process, lensSimple]
   , hsSourceDirs ["lib"]
   ]
 

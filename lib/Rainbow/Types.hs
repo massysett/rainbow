@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric, DeriveDataTypeable, DeriveFunctor,
              DeriveTraversable, DeriveFoldable, TemplateHaskell #-}
+-- Lens.Simple makeLenses will not create signatures
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 -- | All the main types in Rainbow.  Using this module you can specify
 -- that you want different formatting for 8- and 256-color terminals.
@@ -10,7 +12,7 @@ module Rainbow.Types where
 
 -- # Imports
 
-import Lens.Micro.TH (makeLenses)
+import Lens.Simple (makeLenses)
 import Data.Monoid ((<>))
 import Data.Traversable ()
 import Data.Typeable (Typeable)
