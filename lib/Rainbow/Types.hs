@@ -14,6 +14,7 @@ module Rainbow.Types where
 
 import Lens.Simple (makeLenses)
 import Data.Monoid ((<>))
+import Data.String (IsString)
 import Data.Traversable ()
 import Data.Typeable (Typeable)
 import Data.Word (Word8)
@@ -200,6 +201,10 @@ instance Monoid a => Monoid (Chunk a) where
 -- | Creates a 'Chunk' with no formatting and with the given text.
 chunk :: a -> Chunk a
 chunk = Chunk mempty
+
+-- | Allows the use of OverloadedStrings to create chunks with no formatting
+instance IsString a => IsString (Chunk a) where
+  fromString = chunk . fromString
 
 makeLenses ''Chunk
 
