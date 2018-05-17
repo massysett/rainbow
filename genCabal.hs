@@ -27,12 +27,16 @@ process = package "process" (gtEq [1,2])
 lensSimple :: Package
 lensSimple = package "lens-simple" (gtEq [0,1,0])
 
+semigroups :: Package
+semigroups = closedOpen "semigroups" [0, 18] [0, 19]
+
 commonOptions :: HasBuildInfo a => [a]
 commonOptions =
   [ haskell2010
   , ghcOptions ["-Wall"]
   , otherExtensions ["TemplateHaskell"]
   , buildDepends [base, text, bytestring, process, lensSimple]
+  , condBlock (invert (impl ghc (gtEq [8, 0]))) (buildDepends [semigroups], []) []
   , hsSourceDirs ["lib"]
   ]
 

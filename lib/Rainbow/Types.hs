@@ -13,7 +13,7 @@ module Rainbow.Types where
 -- # Imports
 
 import Lens.Simple (makeLenses)
-import Data.Monoid ((<>))
+import Data.Semigroup as Sem
 import Data.Traversable ()
 import Data.Typeable (Typeable)
 import Data.Word (Word8)
@@ -31,13 +31,16 @@ newtype Color a = Color (Maybe a)
   deriving (Eq, Show, Ord, Generic, Typeable, Functor, Foldable,
             Traversable)
 
+-- | Takes the last non-Nothing Color.
+instance Sem.Semigroup (Color a) where
+  Color x <> Color y = case y of
+    Just a -> Color (Just a)
+    _ -> Color x
 
 -- | Takes the last non-Nothing Color.  'mempty' is no color.
 instance Monoid (Color a) where
   mempty = Color Nothing
-  mappend (Color x) (Color y) = case y of
-    Just a -> Color (Just a)
-    _ -> Color x
+  mappend = (<>)
 
 -- | A simple enumeration for eight values.  Represents eight colors.
 data Enum8
@@ -129,13 +132,16 @@ data Format = Format
 makeLenses ''Format
 
 -- | For each field, the resulting field is True if either field is
--- True.  For 'mempty', every field is False.
-instance Monoid Format where
-  mempty = Format False False False False False False False False
-  mappend (Format x0 x1 x2 x3 x4 x5 x6 x7)
-          (Format y0 y1 y2 y3 y4 y5 y6 y7)
+-- True.
+instance Semigroup Format where
+  Format x0 x1 x2 x3 x4 x5 x6 x7 <> Format y0 y1 y2 y3 y4 y5 y6 y7
     = Format (x0 || y0) (x1 || y1) (x2 || y2) (x3 || y3) (x4 || y4)
              (x5 || y5) (x6 || y6) (x7 || y7)
+
+-- | For 'mempty', every field is False.
+instance Monoid Format where
+  mempty = Format False False False False False False False False
+  mappend = (<>)
 
 -- | The foreground and background color, and the 'Format'.  This
 -- represents all colors and formatting attributes for either an 8- or
@@ -149,11 +155,15 @@ data Style a = Style
 
 makeLenses ''Style
 
+-- | Uses the underlying 'Semigroup' instances for 'Color' and 'Format'.
+instance Semigroup (Style a) where
+  Style x0 x1 x2 <> Style y0 y1 y2
+    = Style (x0 <> y0) (x1 <> y1) (x2 <> y2)
+
 -- | Uses the underlying 'Monoid' instances for 'Color' and 'Format'.
 instance Monoid (Style a) where
   mempty = Style mempty mempty mempty
-  mappend (Style x0 x1 x2) (Style y0 y1 y2)
-    = Style (x0 <> y0) (x1 <> y1) (x2 <> y2)
+  mappend = (<>)
 
 --
 -- Scheme
@@ -167,9 +177,12 @@ data Scheme = Scheme
 
 makeLenses ''Scheme
 
+instance Semigroup Scheme where
+  Scheme x0 x1 <> Scheme y0 y1 = Scheme (x0 <> y0) (x1 <> y1)
+
 instance Monoid Scheme where
   mempty = Scheme mempty mempty
-  mappend (Scheme x0 x1) (Scheme y0 y1) = Scheme (x0 <> y0) (x1 <> y1)
+  mappend = (<>)
 
 --
 -- Chunks
@@ -187,15 +200,20 @@ data Chunk a = Chunk
   } deriving (Eq, Show, Ord, Generic, Typeable, Functor,
               Foldable, Traversable)
 
+-- | Uses the underlying 'Semigroup' instances for the 'Style' and for
+-- the particular '_yarn'.
+instance Semigroup a => Semigroup (Chunk a) where
+  Chunk x0 x1 <> Chunk y0 y1
+    = Chunk (x0 <> y0) (x1 <> y1)
+
 -- | Uses the underlying 'Monoid' instances for the 'Style' and for
 -- the particular '_yarn'.  Therefore 'mempty' will have no formatting
 -- and no colors and will generally have no text, though whether or
 -- not there is any text depends on the 'mempty' for the type of the
 -- '_yarn'.
-instance Monoid a => Monoid (Chunk a) where
+instance (Semigroup a, Monoid a) => Monoid (Chunk a) where
   mempty = Chunk mempty mempty
-  mappend (Chunk x0 x1) (Chunk y0 y1)
-    = Chunk (x0 <> y0) (x1 <> y1)
+  mappend = (<>)
 
 -- | Creates a 'Chunk' with no formatting and with the given text.
 chunk :: a -> Chunk a
@@ -211,13 +229,20 @@ data Radiant = Radiant
   , _color256 :: Color Word8
   } deriving (Eq, Ord, Show, Typeable, Generic)
 
+-- | Uses the underlying 'Semigroup' instance for the 'Color's.  Thus the
+-- last non-'Nothing' 'Color' is used.  This can be useful to specify
+-- one color for 8-color terminals and a different color for 256-color
+-- terminals.
+instance Semigroup Radiant where
+  Radiant x0 x1 <> Radiant y0 y1 = Radiant (x0 <> y0) (x1 <> y1)
+
 -- | Uses the underlying 'Monoid' instance for the 'Color's.  Thus the
 -- last non-'Nothing' 'Color' is used.  This can be useful to specify
 -- one color for 8-color terminals and a different color for 256-color
 -- terminals.
 instance Monoid Radiant where
   mempty = Radiant mempty mempty
-  mappend (Radiant x0 x1) (Radiant y0 y1) = Radiant (x0 <> y0) (x1 <> y1)
+  mappend = (<>)
 
 makeLenses ''Radiant
 
