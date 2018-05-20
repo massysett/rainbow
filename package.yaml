@@ -3,7 +3,8 @@
 # https://github.com/sol/hpack
 name: rainbow
 synopsis: Print text to terminal with colors and effects
-version: 0.30.0.0
+description: Please see README.md
+version: 0.30.0.2
 license: BSD3
 license-file: LICENSE
 copyright: Copyright 2013-2018 Omari Norman
@@ -11,8 +12,9 @@ author: Omari Norman
 maintainer: omari@smileystation.com
 stability: Experimental
 homepage: https://www.github.com/massysett/rainbow
-bug-reports: https://www.github.com/massysett/rainbow/issues"
+bug-reports: https://www.github.com/massysett/rainbow/issues
 category: System
+extra-source-files: README.md
 
 dependencies:
   - base >= 4.11 && < 5
