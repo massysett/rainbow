@@ -1,6 +1,11 @@
 I don't keep the best changelogs.  Remember you can always go to
 hdiff.luite.com to compare different released versions.
 
+0.30.0.0
+
+  * Updates for base-4.11, such as Semigroup now being a superclass
+  for Monoid
+
 0.28.0.2
 
   * Changed base dependency to version 4.8.  Also changed

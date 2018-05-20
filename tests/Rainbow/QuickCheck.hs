@@ -13,7 +13,6 @@
 
 module Rainbow.QuickCheck where
 
-import Control.Applicative
 import Test.QuickCheck
 import Rainbow.Types
 import Data.Typeable
