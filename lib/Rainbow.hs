@@ -152,13 +152,6 @@ module Rainbow
   , T.putChunk
   , T.putChunkLn
 
-  -- * Re-exports
-  -- $reexports
-  , module Data.Function
-  , module Data.Word
-  , module Data.ByteString
-  , module Data.Monoid
-
   -- * Notes on terminals
   -- $termNotes
 
@@ -167,11 +160,10 @@ module Rainbow
 import qualified Rainbow.Translate as T
 import qualified Rainbow.Types as Y
 import Data.Word (Word8)
-import Data.ByteString (ByteString)
 import Data.Function ((&))
 import qualified Lens.Simple as Lens
 import Lens.Simple ((.~))
-import Data.Monoid (Monoid(mempty), (<>))
+import Data.Monoid (Monoid(mempty))
 
 formatBoth :: Lens.Setter' Y.Format Bool -> Y.Chunk a -> Y.Chunk a
 formatBoth get c = c & Y.scheme . Y.style8 . Y.format . get .~ True
@@ -282,18 +274,6 @@ brightWhite = color256 15
 color256 :: Word8 -> Y.Radiant
 color256 x = Y.Radiant (Y.Color Nothing) (Y.Color (Just x))
 
-
-{- $reexports
-
-   * "Data.Function" re-exports '&'
-
-   * "Data.Monoid" re-exports 'Monoid', '<>' and 'mempty'
-
-   * "Data.ByteString" re-exports 'ByteString'
-
-   * "Data.Word" re-exports 'Word8'
-
--}
 
 {- $termNotes
 
