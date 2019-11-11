@@ -2,6 +2,7 @@ module Main where
 
 import Rainbow
 import qualified Data.ByteString as BS
+import Data.Function ((&))
 
 colors8 :: [(String, Radiant)]
 colors8 =

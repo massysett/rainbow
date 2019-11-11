@@ -1,6 +1,7 @@
 module Main where
 
 import Control.Arrow (second)
+import Data.Function ((&))
 import Rainbow
 import qualified Data.ByteString as BS
 
