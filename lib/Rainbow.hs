@@ -138,7 +138,7 @@ module Rainbow
   -- argument.  'T.chunksToByteStrings' has an example.
   --
   -- For output to handles or to standard output, just use
-  -- 'hPutChunks' or 'putChunks'.
+  -- 'T.hPutChunks' or 'T.putChunks'.
   , T.Renderable
   , T.toByteStringsColors0
   , T.toByteStringsColors8
@@ -146,6 +146,8 @@ module Rainbow
   , T.byteStringMakerFromEnvironment
   , T.byteStringMakerFromHandle
   , T.chunksToByteStrings
+
+  -- * Writing 'Y.Chunk' to a handle or to standard output
   , T.putChunks
   , T.hPutChunks
 

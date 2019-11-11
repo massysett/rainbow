@@ -278,7 +278,7 @@ byteStringMakerFromEnvironment
         g (Right good) = good
 
 -- | Like 'byteStringMakerFromEnvironment' but also consults a
--- provided 'Handle'.  If the 'Handle' is not a terminal,
+-- provided 'IO.Handle'.  If the 'IO.Handle' is not a terminal,
 -- 'toByteStringsColors0' is returned.  Otherwise, the value of
 -- 'byteStringMakerFromEnvironment' is returned.
 byteStringMakerFromHandle
@@ -329,11 +329,11 @@ chunksToByteStrings
   -> [ByteString]
 chunksToByteStrings mk = ($ []) . foldr (.) id . map mk
 
--- | Writes a list of chunks to the given 'Handle'.  
+-- | Writes a list of chunks to the given 'IO.Handle'.
 --
 -- First uses 'byteStringMakerFromEnvironment' to determine how many
 -- colors to use.  Then creates a list of 'ByteString' using
--- 'chunksToByteStrings' and then writes them to the given 'Handle'.
+-- 'chunksToByteStrings' and then writes them to the given 'IO.Handle'.
 hPutChunks :: Renderable a => IO.Handle -> [T.Chunk a] -> IO ()
 hPutChunks h cks = do
   maker <- byteStringMakerFromEnvironment
