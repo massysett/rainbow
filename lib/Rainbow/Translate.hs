@@ -246,7 +246,6 @@ toByteStringsColors256 (T.Chunk (T.Scheme _ s256) yn)
   . normalDefault
 
 
-
 -- | Spawns a subprocess to read the output of @tput colors@.  If this
 -- says there are at least 256 colors are available, returns
 -- 'toByteStringsColors256'.  Otherwise, if there are at least 8
@@ -329,6 +328,25 @@ chunksToByteStrings
   -> [T.Chunk a]
   -> [ByteString]
 chunksToByteStrings mk = ($ []) . foldr (.) id . map mk
+
+-- | Writes a list of chunks to the given 'Handle'.  
+--
+-- First uses 'byteStringMakerFromEnvironment' to determine how many
+-- colors to use.  Then creates a list of 'ByteString' using
+-- 'chunksToByteStrings' and then writes them to the given 'Handle'.
+hPutChunks :: Renderable a => IO.Handle -> [T.Chunk a] -> IO ()
+hPutChunks h cks = do
+  maker <- byteStringMakerFromEnvironment
+  let bsList = chunksToByteStrings maker cks
+  mapM_ (BS.hPut h) bsList
+
+-- | Writes a list of chunks to standard output.
+--
+-- First uses 'byteStringMakerFromEnvironment' to determine how many
+-- colors to use.  Then creates a list of 'ByteString' using
+-- 'chunksToByteStrings' and then writes them to standard output.
+putChunks :: Renderable a => [T.Chunk a] -> IO ()
+putChunks = hPutChunks IO.stdout
 
 -- Quick and dirty I/O functions
 

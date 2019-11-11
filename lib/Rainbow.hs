@@ -136,6 +136,9 @@ module Rainbow
   -- colors, use 'T.chunksToByteStrings' with 'T.toByteStringsColors0',
   -- 'T.toByteStringsColors8', or 'T.toByteStringsColors256' as the first
   -- argument.  'T.chunksToByteStrings' has an example.
+  --
+  -- For output to handles or to standard output, just use
+  -- 'hPutChunks' or 'putChunks'.
   , T.Renderable
   , T.toByteStringsColors0
   , T.toByteStringsColors8
@@ -143,6 +146,8 @@ module Rainbow
   , T.byteStringMakerFromEnvironment
   , T.byteStringMakerFromHandle
   , T.chunksToByteStrings
+  , T.putChunks
+  , T.hPutChunks
 
   -- * Quick and dirty functions for IO
 
