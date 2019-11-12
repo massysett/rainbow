@@ -139,7 +139,6 @@ module Rainbow
   --
   -- For output to handles or to standard output, just use
   -- 'T.hPutChunks' or 'T.putChunks'.
-  , T.Renderable
   , T.toByteStringsColors0
   , T.toByteStringsColors8
   , T.toByteStringsColors256
@@ -172,7 +171,7 @@ import qualified Lens.Simple as Lens
 import Lens.Simple ((.~))
 import Data.Monoid (Monoid(mempty))
 
-formatBoth :: Lens.Setter' Y.Format Bool -> Y.Chunk a -> Y.Chunk a
+formatBoth :: Lens.Setter' Y.Format Bool -> Y.Chunk -> Y.Chunk
 formatBoth get c = c & Y.scheme . Y.style8 . Y.format . get .~ True
   & Y.scheme . Y.style256 . Y.format . get .~ True
 
@@ -185,37 +184,37 @@ formatBoth get c = c & Y.scheme . Y.style8 . Y.format . get .~ True
 --
 -- If your terminal uses a different color for bold, this allows an
 -- 8-color terminal to really have 16 colors.
-bold :: Y.Chunk a -> Y.Chunk a
+bold :: Y.Chunk -> Y.Chunk
 bold = formatBoth Y.bold
 
-faint :: Y.Chunk a -> Y.Chunk a
+faint :: Y.Chunk -> Y.Chunk
 faint = formatBoth Y.faint
 
-italic :: Y.Chunk a -> Y.Chunk a
+italic :: Y.Chunk -> Y.Chunk
 italic = formatBoth Y.italic
 
-underline :: Y.Chunk a -> Y.Chunk a
+underline :: Y.Chunk -> Y.Chunk
 underline = formatBoth Y.underline
 
-blink :: Y.Chunk a -> Y.Chunk a
+blink :: Y.Chunk -> Y.Chunk
 blink = formatBoth Y.blink
 
-inverse :: Y.Chunk a -> Y.Chunk a
+inverse :: Y.Chunk -> Y.Chunk
 inverse = formatBoth Y.inverse
 
-invisible :: Y.Chunk a -> Y.Chunk a
+invisible :: Y.Chunk -> Y.Chunk
 invisible = formatBoth Y.invisible
 
-strikeout :: Y.Chunk a -> Y.Chunk a
+strikeout :: Y.Chunk -> Y.Chunk
 strikeout = formatBoth Y.strikeout
 
 -- | Change the foreground color for both 8- and 256-color terminals.
-fore :: Y.Radiant -> Y.Chunk a -> Y.Chunk a
+fore :: Y.Radiant -> Y.Chunk -> Y.Chunk
 fore (Y.Radiant c8 c256) c = c & Y.scheme . Y.style8 . Y.fore .~ c8
   & Y.scheme . Y.style256 . Y.fore .~ c256
 
 -- | Change the background color for both 8- and 256-color terminals.
-back :: Y.Radiant -> Y.Chunk a -> Y.Chunk a
+back :: Y.Radiant -> Y.Chunk -> Y.Chunk
 back (Y.Radiant c8 c256) c = c & Y.scheme . Y.style8 . Y.back .~ c8
   & Y.scheme . Y.style256 . Y.back .~ c256
 

@@ -7,10 +7,8 @@ module Rainbow.Translate where
 
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as BSL
-import qualified Data.Text as X
+import Data.Text (Text)
 import qualified Data.Text.Encoding as X
-import qualified Data.Text.Lazy as XL
 import Data.ByteString (ByteString)
 import Data.Word (Word8)
 import Data.List (intersperse)
@@ -22,31 +20,6 @@ import Control.Monad (mzero)
 import Control.Exception (try, IOException)
 import qualified System.IO as IO
 
-
--- | Items that can be rendered.  'render' returns a difference list.
-class Renderable a where
-  render :: a -> [ByteString] -> [ByteString]
-
--- | Converts a strict Text to a UTF-8 ByteString.
-instance Renderable X.Text where
-  render x = (X.encodeUtf8 x :)
-
--- | Converts a lazy Text to UTF-8 ByteStrings.
-instance Renderable XL.Text where
-  render = foldr (.) id . map render . XL.toChunks
-
--- | Strict ByteString is left as-is.
-instance Renderable BS.ByteString where
-  render x = (x :)
-
--- | Lazy ByteString is converted to strict chunks.
-instance Renderable BSL.ByteString where
-  render x = (BSL.toChunks x ++)
-
--- | Strings are converted first to a strict Text and then to a strict
--- ByteString.
-instance Renderable String where
-  render x = ((X.encodeUtf8 . X.pack $ x):)
 
 single :: Char -> [ByteString] -> [ByteString]
 single c = ((BS8.singleton c):)
@@ -216,16 +189,17 @@ renderStyle256 (T.Style fore back format)
   where
     effect on (T.Color may) = maybe id on may
 
+render :: Text -> [ByteString] -> [ByteString]
+render x = (X.encodeUtf8 x :)
+
 toByteStringsColors0
-  :: Renderable a
-  => T.Chunk a
+  :: T.Chunk
   -> [ByteString]
   -> [ByteString]
 toByteStringsColors0 (T.Chunk _ yn) = render yn
 
 toByteStringsColors8
-  :: Renderable a
-  => T.Chunk a
+  :: T.Chunk
   -> [ByteString]
   -> [ByteString]
 toByteStringsColors8 (T.Chunk (T.Scheme s8 _) yn)
@@ -235,8 +209,7 @@ toByteStringsColors8 (T.Chunk (T.Scheme s8 _) yn)
   . normalDefault
 
 toByteStringsColors256
-  :: Renderable a
-  => T.Chunk a
+  :: T.Chunk
   -> [ByteString]
   -> [ByteString]
 toByteStringsColors256 (T.Chunk (T.Scheme _ s256) yn)
@@ -255,8 +228,7 @@ toByteStringsColors256 (T.Chunk (T.Scheme _ s256) yn)
 -- If any IO exceptions arise during this process, they are discarded
 -- and 'toByteStringsColors0' is returned.
 byteStringMakerFromEnvironment
-  :: Renderable a
-  => IO (T.Chunk a -> [ByteString] -> [ByteString])
+  :: IO (T.Chunk -> [ByteString] -> [ByteString])
 byteStringMakerFromEnvironment
   = catcher (fmap f $ readProcessWithExitCode "tput" ["colors"] "")
   where
@@ -282,9 +254,8 @@ byteStringMakerFromEnvironment
 -- 'toByteStringsColors0' is returned.  Otherwise, the value of
 -- 'byteStringMakerFromEnvironment' is returned.
 byteStringMakerFromHandle
-  :: Renderable a
-  => IO.Handle
-  -> IO (T.Chunk a -> [ByteString] -> [ByteString])
+  :: IO.Handle
+  -> IO (T.Chunk -> [ByteString] -> [ByteString])
 byteStringMakerFromHandle h = IO.hIsTerminalDevice h >>= f
   where
     f isTerm | isTerm = byteStringMakerFromEnvironment
@@ -322,10 +293,10 @@ byteStringMakerFromHandle h = IO.hIsTerminalDevice h >>= f
 -- >     $ myChunks
 
 chunksToByteStrings
-  :: (T.Chunk a -> [ByteString] -> [ByteString])
+  :: (T.Chunk -> [ByteString] -> [ByteString])
   -- ^ Function that converts 'T.Chunk' to 'ByteString'.  This
   -- function, when applied to a 'T.Chunk', returns a difference list.
-  -> [T.Chunk a]
+  -> [T.Chunk]
   -> [ByteString]
 chunksToByteStrings mk = ($ []) . foldr (.) id . map mk
 
@@ -334,7 +305,7 @@ chunksToByteStrings mk = ($ []) . foldr (.) id . map mk
 -- First uses 'byteStringMakerFromEnvironment' to determine how many
 -- colors to use.  Then creates a list of 'ByteString' using
 -- 'chunksToByteStrings' and then writes them to the given 'IO.Handle'.
-hPutChunks :: Renderable a => IO.Handle -> [T.Chunk a] -> IO ()
+hPutChunks :: IO.Handle -> [T.Chunk] -> IO ()
 hPutChunks h cks = do
   maker <- byteStringMakerFromEnvironment
   let bsList = chunksToByteStrings maker cks
@@ -345,7 +316,7 @@ hPutChunks h cks = do
 -- First uses 'byteStringMakerFromEnvironment' to determine how many
 -- colors to use.  Then creates a list of 'ByteString' using
 -- 'chunksToByteStrings' and then writes them to standard output.
-putChunks :: Renderable a => [T.Chunk a] -> IO ()
+putChunks :: [T.Chunk] -> IO ()
 putChunks = hPutChunks IO.stdout
 
 -- Quick and dirty I/O functions
@@ -356,7 +327,7 @@ putChunks = hPutChunks IO.stdout
 -- any speed awards.  You are better off using 'chunksToByteStrings'
 -- and the functions in "Data.ByteString" to print your 'T.Chunk's if
 -- you are printing a lot of them.
-putChunk :: Renderable a => T.Chunk a -> IO ()
+putChunk :: T.Chunk -> IO ()
 putChunk ck = do
   mkr <- byteStringMakerFromEnvironment
   mapM_ BS.putStr . chunksToByteStrings mkr $ [ck]
@@ -368,5 +339,5 @@ putChunk ck = do
 -- better off using 'chunksToByteStrings' and the functions in
 -- "Data.ByteString" to print your 'T.Chunk's if you are printing a lot
 -- of them.
-putChunkLn :: Renderable a => T.Chunk a -> IO ()
+putChunkLn :: T.Chunk -> IO ()
 putChunkLn ck = putChunk ck >> putStrLn ""

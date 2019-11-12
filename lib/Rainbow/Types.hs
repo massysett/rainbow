@@ -13,6 +13,9 @@ module Rainbow.Types where
 -- # Imports
 
 import Lens.Simple (makeLenses)
+import Data.String
+import Data.Text (Text)
+import qualified Data.Text as X
 import Data.Traversable ()
 import Data.Typeable (Typeable)
 import Data.Word (Word8)
@@ -186,26 +189,29 @@ instance Monoid Scheme where
 -- colors and what attributes to use for both an 8 color terminal and
 -- a 256 color terminal.
 
-data Chunk a = Chunk
+data Chunk = Chunk
   { _scheme :: Scheme
-  , _yarn :: a
-  } deriving (Eq, Show, Ord, Generic, Typeable, Functor,
-              Foldable, Traversable)
+  , _yarn :: Text
+  } deriving (Eq, Show, Ord, Generic, Typeable)
 
-instance Semigroup a => Semigroup (Chunk a) where
+instance Semigroup Chunk where
   (Chunk x0 x1) <> (Chunk y0 y1)
     = Chunk (x0 <> y0) (x1 <> y1)
 
--- | Uses the underlying 'Monoid' instances for the 'Style' and for
+-- | Creates a 'Chunk' with no formatting and with the given text.
+instance IsString Chunk where
+  fromString = chunk . X.pack
+
+-- | Uses the underlying 'Monoid' instances for the 'Scheme' and for
 -- the particular '_yarn'.  Therefore 'mempty' will have no formatting
 -- and no colors and will generally have no text, though whether or
 -- not there is any text depends on the 'mempty' for the type of the
 -- '_yarn'.
-instance Monoid a => Monoid (Chunk a) where
+instance Monoid Chunk where
   mempty = Chunk mempty mempty
 
 -- | Creates a 'Chunk' with no formatting and with the given text.
-chunk :: a -> Chunk a
+chunk :: Text -> Chunk
 chunk = Chunk mempty
 
 makeLenses ''Chunk
