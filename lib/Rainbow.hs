@@ -167,8 +167,8 @@ import qualified Rainbow.Translate as T
 import qualified Rainbow.Types as Y
 import Data.Word (Word8)
 import Data.Function ((&))
-import qualified Lens.Simple as Lens
-import Lens.Simple ((.~))
+import qualified Control.Lens as Lens
+import Control.Lens ((.~))
 import Data.Monoid (Monoid(mempty))
 
 formatBoth :: Lens.Setter' Y.Format Bool -> Y.Chunk -> Y.Chunk

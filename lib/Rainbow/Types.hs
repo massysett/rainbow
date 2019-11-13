@@ -12,7 +12,7 @@ module Rainbow.Types where
 
 -- # Imports
 
-import Lens.Simple (makeLenses)
+import Control.Lens (makeLenses)
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as X

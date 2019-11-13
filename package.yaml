@@ -23,7 +23,7 @@ dependencies:
   - text
   - bytestring
   - process
-  - lens-simple
+  - lens
 
 ghc-options: -Wall
 other-extensions: TemplateHaskell
