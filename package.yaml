@@ -14,7 +14,9 @@ stability: Experimental
 homepage: https://www.github.com/massysett/rainbow
 bug-reports: https://www.github.com/massysett/rainbow/issues
 category: System
-extra-source-files: README.md
+extra-source-files:
+  - README.md
+  - stack.yaml
 
 dependencies:
   - base >= 4.11 && < 5

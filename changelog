@@ -1,6 +1,13 @@
 I don't keep the best changelogs.  Remember you can always go to
 hdiff.luite.com to compare different released versions.
 
+0.32.0.0
+
+  * Make chunks monomorphic.  Polymorphism was never used
+  and was interfering with making Chunk an instance of IsString.
+
+  * Make Chunk an instance of of IsString
+
 0.30.0.0
 
   * Updates for base-4.11, such as Semigroup now being a superclass
