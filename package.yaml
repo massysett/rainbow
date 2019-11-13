@@ -4,7 +4,7 @@
 name: rainbow
 synopsis: Print text to terminal with colors and effects
 description: Please see README.md
-version: 0.32.0.0
+version: 0.34.0.0
 license: BSD3
 license-file: LICENSE
 copyright: Copyright 2013-2018 Omari Norman

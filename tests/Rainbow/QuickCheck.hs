@@ -13,9 +13,19 @@
 
 module Rainbow.QuickCheck where
 
-import Test.QuickCheck
-import Rainbow.Types
+import qualified Data.Text as X
 import Data.Typeable
+import Rainbow.Types
+import Test.QuickCheck
+
+instance Arbitrary X.Text where
+  arbitrary = fmap X.pack $ listOf genChar
+    where
+      genChar = elements ['a'..'z']
+  shrink = fmap X.pack . shrink . X.unpack
+
+instance CoArbitrary X.Text where
+  coarbitrary = coarbitrary . X.unpack
 
 instance (Typeable a, Arbitrary a) => Arbitrary (Color a) where
   arbitrary = Color <$> arbitrary
@@ -78,11 +88,11 @@ instance CoArbitrary Scheme where
   coarbitrary (Scheme a b) = coarbitrary a . coarbitrary b
 
 
-instance (Arbitrary a, Typeable a) => Arbitrary (Chunk a) where
+instance Arbitrary Chunk where
   arbitrary = Chunk <$> arbitrary <*> arbitrary
   shrink = genericShrink
 
-instance CoArbitrary a => CoArbitrary (Chunk a) where
+instance CoArbitrary Chunk where
   coarbitrary (Chunk a b)
     = coarbitrary a
     . coarbitrary b

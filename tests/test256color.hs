@@ -1,11 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Control.Arrow (second)
 import Data.Function ((&))
 import Rainbow
 import qualified Data.ByteString as BS
+import qualified Data.Text as X
 
-effects :: [(String, Chunk a -> Chunk a)]
+effects :: [(String, Chunk -> Chunk)]
 effects =
   [ ("bold", bold)
   , ("faint", faint)
@@ -22,7 +24,7 @@ colors = ("(no color)", mempty) : map mkColor [minBound..maxBound]
   where
     mkColor w = (show w, color256 w)
 
-maybeEffects :: [(String, Maybe (Chunk a -> Chunk a))]
+maybeEffects :: [(String, Maybe (Chunk -> Chunk))]
 maybeEffects = ("(no effect)", Nothing)
   : map (second Just) effects
 
@@ -39,14 +41,14 @@ combinations k xs = combinations' (length xs) k xs
                             ++ combinations' (n - 1) k' ys 
 -}
 
-colorsAndEffects :: [[Chunk String]]
+colorsAndEffects :: [[Chunk]]
 colorsAndEffects = do
   (fgColorName, fgColor) <- colors
   (bgColorName, bgColor) <- colors
   (effectName, mayEffect) <- maybeEffects
   let lbl = "foreground " ++ fgColorName ++ " background " ++ bgColorName
           ++ " effect " ++ effectName
-  return $ [ chunk lbl & fore fgColor
+  return $ [ chunk (X.pack lbl) & fore fgColor
              & back bgColor
              & maybe id id mayEffect
            , chunk "\n"
