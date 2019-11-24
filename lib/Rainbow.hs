@@ -63,7 +63,7 @@
 -- @
 --
 -- Most of the above examples use 'T.putChunkLn', but that function
--- will be inefficient if you are printing many 'Y.Chunk's.  For
+-- may be inefficient if you are printing many 'Y.Chunk's.  For
 -- greater efficiency use functions under the heading \"Converting
 -- multiple Chunk to ByteString\", including 'T.putChunksLn' and
 -- 'T.putChunks'.
@@ -342,10 +342,6 @@ situations just use 'T.toByteStringsColors0'.
 
 I also decided to standardize on UTF-8 for the 'Data.Text.Text'
 output.  These days that seems reasonable.
-
-Now, to figure out how many colors the terminal supports, Rainbow
-simply uses the @tput@ program.  This removes the dependency on
-Terminfo altogether.
 
 Apparently it's difficult to get ISO 6429 support on Microsoft
 Windows.  Oh well.

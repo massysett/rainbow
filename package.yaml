@@ -22,7 +22,7 @@ dependencies:
   - base >= 4.11 && < 5
   - text
   - bytestring
-  - process
+  - terminfo
   - lens
 
 ghc-options: -Wall

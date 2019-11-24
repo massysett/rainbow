@@ -5,19 +5,16 @@
 -- exported from "Rainbow".
 module Rainbow.Translate where
 
-import qualified Data.ByteString.Char8 as BS8
-import qualified Data.ByteString as BS
-import Data.Text (Text)
-import qualified Data.Text.Encoding as X
-import Data.ByteString (ByteString)
-import Data.Word (Word8)
-import Data.List (intersperse)
-import qualified Rainbow.Types as T
-import System.Process (readProcessWithExitCode)
-import Text.Read (readMaybe)
-import System.Exit (ExitCode(ExitFailure))
-import Control.Monad (mzero)
 import Control.Exception (try, IOException)
+import Data.ByteString (ByteString)
+import Data.List (intersperse)
+import Data.Text (Text)
+import Data.Word (Word8)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
+import qualified Data.Text.Encoding as X
+import qualified Rainbow.Types as T
+import qualified System.Console.Terminfo as Terminfo
 import qualified System.IO as IO
 
 
@@ -219,35 +216,29 @@ toByteStringsColors256 (T.Chunk (T.Scheme _ s256) yn)
   . normalDefault
 
 
--- | Spawns a subprocess to read the output of @tput colors@.  If this
--- says there are at least 256 colors are available, returns
--- 'toByteStringsColors256'.  Otherwise, if there are at least 8
--- colors available, returns 'toByteStringsColors8'.  Otherwise,
--- returns 'toByteStringsColors0'.
+-- | Uses 'Terminfo.setupTermFromEnv' to obtain the terminal's color
+-- capability.  If this says there are at least 256 colors are
+-- available, returns 'toByteStringsColors256'.  Otherwise, if there
+-- are at least 8 colors available, returns 'toByteStringsColors8'.
+-- Otherwise, returns 'toByteStringsColors0'.
 --
 -- If any IO exceptions arise during this process, they are discarded
 -- and 'toByteStringsColors0' is returned.
+--
 byteStringMakerFromEnvironment
   :: IO (T.Chunk -> [ByteString] -> [ByteString])
-byteStringMakerFromEnvironment
-  = catcher (fmap f $ readProcessWithExitCode "tput" ["colors"] "")
+byteStringMakerFromEnvironment = fmap g (try Terminfo.setupTermFromEnv)
   where
-    f (code, stdOut, _) = maybe toByteStringsColors0 id $ do
-      case code of
-        ExitFailure _ -> mzero
-        _ -> return ()
-      numColors <- readMaybe stdOut
-      return $ numColorsToFunc numColors
-    numColorsToFunc i
-      | i >= (256 :: Int) = toByteStringsColors256
-      | i >= 8 = toByteStringsColors8
-      | otherwise = toByteStringsColors0
-
-    catcher act = fmap g (try act)
+    g (Left e) = toByteStringsColors0
       where
-        g (Left e) = toByteStringsColors0
-          where _types = e :: IOException
-        g (Right good) = good
+        _types = e :: IOException
+    g (Right terminal) =
+      case Terminfo.getCapability terminal (Terminfo.tiGetNum "colors") of
+        Nothing -> toByteStringsColors0
+        Just c
+          | c >= 256 -> toByteStringsColors256
+          | c >= 8 -> toByteStringsColors8
+          | otherwise -> toByteStringsColors0
 
 -- | Like 'byteStringMakerFromEnvironment' but also consults a
 -- provided 'IO.Handle'.  If the 'IO.Handle' is not a terminal,
@@ -341,23 +332,20 @@ putChunksLn cks = do
   putChunks cks
   IO.putStr "\n"
 
--- | Writes a 'T.Chunk' to standard output.  Spawns a child process to
--- read the output of @tput colors@ to determine how many colors to
--- use, for every single chunk.  Therefore, this is not going to win
--- any speed awards.  You are better off using 'chunksToByteStrings'
--- and the functions in "Data.ByteString" to print your 'T.Chunk's if
--- you are printing a lot of them.
+-- | Writes a 'T.Chunk' to standard output.  Uses
+-- 'byteStringMakerFromEnvironment' each time you apply it, so this
+-- might be inefficient.  You are better off using
+-- 'chunksToByteStrings' and the functions in "Data.ByteString" to
+-- print your 'T.Chunk's if you are printing a lot of them.
 putChunk :: T.Chunk -> IO ()
 putChunk ck = do
   mkr <- byteStringMakerFromEnvironment
   mapM_ BS.putStr . chunksToByteStrings mkr $ [ck]
 
 -- | Writes a 'T.Chunk' to standard output, and appends a newline.
--- Spawns a child process to read the output of @tput colors@ to
--- determine how many colors to use, for every single chunk.
--- Therefore, this is not going to win any speed awards.  You are
--- better off using 'chunksToByteStrings' and the functions in
--- "Data.ByteString" to print your 'T.Chunk's if you are printing a lot
--- of them.
+-- Uses 'byteStringMakerFromEnvironment' each time you apply it, so
+-- this might be inefficient.  You are better off using
+-- 'chunksToByteStrings' and the functions in "Data.ByteString" to
+-- print your 'T.Chunk's if you are printing a lot of them.
 putChunkLn :: T.Chunk -> IO ()
 putChunkLn ck = putChunk ck >> putStrLn ""
