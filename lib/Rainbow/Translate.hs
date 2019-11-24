@@ -311,6 +311,17 @@ hPutChunks h cks = do
   let bsList = chunksToByteStrings maker cks
   mapM_ (BS.hPut h) bsList
 
+-- | Writes a list of chunks to the given 'IO.Handle', followed by a
+-- newline character.
+--
+-- First uses 'byteStringMakerFromEnvironment' to determine how many
+-- colors to use.  Then creates a list of 'ByteString' using
+-- 'chunksToByteStrings' and then writes them to the given 'IO.Handle'.
+hPutChunksLn :: IO.Handle -> [T.Chunk] -> IO ()
+hPutChunksLn h cks = do
+  hPutChunks h cks
+  IO.hPutStr h "\n"
+
 -- | Writes a list of chunks to standard output.
 --
 -- First uses 'byteStringMakerFromEnvironment' to determine how many
@@ -319,7 +330,17 @@ hPutChunks h cks = do
 putChunks :: [T.Chunk] -> IO ()
 putChunks = hPutChunks IO.stdout
 
+-- | Writes a list of chunks to standard output, followed by a
+-- newline.
+--
+-- First uses 'byteStringMakerFromEnvironment' to determine how many
+-- colors to use.  Then creates a list of 'ByteString' using
+-- 'chunksToByteStrings' and then writes them to standard output.
 -- Quick and dirty I/O functions
+putChunksLn :: [T.Chunk] -> IO ()
+putChunksLn cks = do
+  putChunks cks
+  IO.putStr "\n"
 
 -- | Writes a 'T.Chunk' to standard output.  Spawns a child process to
 -- read the output of @tput colors@ to determine how many colors to

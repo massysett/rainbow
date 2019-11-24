@@ -10,7 +10,10 @@
 -- | Rainbow handles colors and special effects for text.  The basic
 -- building block of Rainbow is the 'Y.Chunk'.  The 'Y.Chunk' contains
 -- both text and formatting information such as colors, bold,
--- underlining, etc.
+-- underlining, etc.  'Y.Chunk' is an instance of
+-- 'Data.String.IsString' so you can create a 'Y.Chunk' using the
+-- @OverloadedStrings@ extension.  Such a chunk has the given text
+-- and has no formatting.
 --
 -- When printed, each 'Y.Chunk' starts off with a clean slate, so if
 -- you want special formatting such as any color, bold, etc, then you
@@ -27,10 +30,13 @@
 -- Here are some basic examples:
 --
 -- @
--- 'T.putChunkLn' $ 'Y.chunk' \"Some blue text\" '&' 'fore' 'blue'
--- 'T.putChunkLn' $ 'Y.chunk' \"Blue on red background\"
+-- ghci> import Rainbow
+-- ghci> import Data.Function ((&))
+-- ghci> :set -XOverloadedStrings
+-- ghci> 'T.putChunkLn' $ \"Some blue text\" '&' 'fore' 'blue'
+-- ghci> 'T.putChunkLn' $ \"Blue on red background\"
 --               '&' 'fore' 'blue' '&' 'back' 'red'
--- 'T.putChunkLn' $ 'Y.chunk' \"Blue on red, foreground bold\"
+-- ghci> 'T.putChunkLn' $ \"Blue on red, foreground bold\"
 --                '&' 'fore' 'blue' '&' 'back' 'red' '&' 'bold'
 -- @
 --
@@ -40,10 +46,10 @@
 -- you start GHCi.
 --
 -- @
--- 'T.putChunkLn' $ 'Y.chunk' \"Blue on 8, bright green on 256\" '&'
+-- ghci> 'T.putChunkLn' $ \"Blue on 8, bright green on 256\" '&'
 --    'fore' ('blue' '<>' 'brightGreen')
 --
--- 'T.putChunkLn' $ 'Y.chunk' \"Blue on 8, red on 256" '&'
+-- ghci> 'T.putChunkLn' $ \"Blue on 8, red on 256" '&'
 --    'fore' ('blue' '<>' 'only256' 'red')
 -- @
 --
@@ -51,14 +57,16 @@
 -- to print things in different colors, make more than one 'Y.Chunk':
 --
 -- @
--- 'mapM_' 'T.putChunkLn'
---    [ 'Y.chunk' \"Roses\" '&' 'fore' 'red'
---    , 'Y.chunk' \"Violets\" '&' 'fore' 'blue' ]
+-- ghci> 'T.putChunksLn'
+--    [ \"Roses\" '&' 'fore' 'red'
+--    , \"Violets\" '&' 'fore' 'blue' ]
 -- @
 --
--- The above examples use 'T.putChunkLn', but that function will
--- be inefficient if you are printing many 'Y.Chunk's.  For
--- greater efficiency see 'T.chunksToByteStrings'.
+-- Most of the above examples use 'T.putChunkLn', but that function
+-- will be inefficient if you are printing many 'Y.Chunk's.  For
+-- greater efficiency use functions under the heading \"Converting
+-- multiple Chunk to ByteString\", including 'T.putChunksLn' and
+-- 'T.putChunks'.
 --
 -- The functions in this module, "Rainbow", will likely be enough for
 -- most uses, but for more flexibility you can use "Rainbow.Types".
@@ -117,7 +125,7 @@ module Rainbow
   , color256
   , only256
 
-  -- * Converting 'Y.Chunk' to 'Data.ByteString.ByteString'
+  -- * Converting multiple 'Y.Chunk' to 'Data.ByteString.ByteString'
 
   -- | To print a 'Y.Chunk', you need to convert it to some
   -- 'Data.ByteString.ByteString's.
@@ -146,9 +154,11 @@ module Rainbow
   , T.byteStringMakerFromHandle
   , T.chunksToByteStrings
 
-  -- * Writing 'Y.Chunk' to a handle or to standard output
+  -- * Writing multiple 'Y.Chunk' to a handle or to standard output
   , T.putChunks
   , T.hPutChunks
+  , T.putChunksLn
+  , T.hPutChunksLn
 
   -- * Quick and dirty functions for IO
 
@@ -208,12 +218,14 @@ invisible = formatBoth Y.invisible
 strikeout :: Y.Chunk -> Y.Chunk
 strikeout = formatBoth Y.strikeout
 
--- | Change the foreground color for both 8- and 256-color terminals.
+-- | Change the foreground color.  Whether this affects 8-color
+-- terminals, 256-color terminals, or both depends on the 'Radiant'.
 fore :: Y.Radiant -> Y.Chunk -> Y.Chunk
 fore (Y.Radiant c8 c256) c = c & Y.scheme . Y.style8 . Y.fore .~ c8
   & Y.scheme . Y.style256 . Y.fore .~ c256
 
--- | Change the background color for both 8- and 256-color terminals.
+-- | Change the background color.  Whether this affects 8-color
+-- terminals, 256-color terminals, or both depends on the 'Radiant'.
 back :: Y.Radiant -> Y.Chunk -> Y.Chunk
 back (Y.Radiant c8 c256) c = c & Y.scheme . Y.style8 . Y.back .~ c8
   & Y.scheme . Y.style256 . Y.back .~ c256

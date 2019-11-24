@@ -1,7 +1,5 @@
 {-# LANGUAGE DeriveGeneric, DeriveDataTypeable, DeriveFunctor,
              DeriveTraversable, DeriveFoldable, TemplateHaskell #-}
--- Lens.Simple makeLenses will not create signatures
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 -- | All the main types in Rainbow.  Using this module you can specify
 -- that you want different formatting for 8- and 256-color terminals.
@@ -194,6 +192,8 @@ data Chunk = Chunk
   , _yarn :: Text
   } deriving (Eq, Show, Ord, Generic, Typeable)
 
+-- | Uses the underlying 'Semigroup' instances for both the
+-- underlying 'Scheme' and the underlying 'Text'.
 instance Semigroup Chunk where
   (Chunk x0 x1) <> (Chunk y0 y1)
     = Chunk (x0 <> y0) (x1 <> y1)
@@ -203,14 +203,15 @@ instance IsString Chunk where
   fromString = chunk . X.pack
 
 -- | Uses the underlying 'Monoid' instances for the 'Scheme' and for
--- the particular '_yarn'.  Therefore 'mempty' will have no formatting
--- and no colors and will generally have no text, though whether or
--- not there is any text depends on the 'mempty' for the type of the
--- '_yarn'.
+-- the underlying 'Text'.  Therefore 'mempty' will have no
+-- formatting, no colors, and no text.
 instance Monoid Chunk where
   mempty = Chunk mempty mempty
 
 -- | Creates a 'Chunk' with no formatting and with the given text.
+-- A 'Chunk' is also an instance of 'Data.String.IsString' so you
+-- can create them with the @OverloadedStrings@ extension.  Such a
+-- 'Chunk' has the text of the string and no formatting.
 chunk :: Text -> Chunk
 chunk = Chunk mempty
 
