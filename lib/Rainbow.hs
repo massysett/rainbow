@@ -163,7 +163,7 @@ module Rainbow
   -- * Quick and dirty functions for IO
 
   -- | For efficiency reasons you probably don't want to use these
-  -- when printing large numbers of 'Chunk', but they are handy for
+  -- when printing large numbers of 'Y.Chunk', but they are handy for
   -- throwaway uses like experimenting in GHCi.
   , T.putChunk
   , T.putChunkLn
@@ -219,13 +219,13 @@ strikeout :: Y.Chunk -> Y.Chunk
 strikeout = formatBoth Y.strikeout
 
 -- | Change the foreground color.  Whether this affects 8-color
--- terminals, 256-color terminals, or both depends on the 'Radiant'.
+-- terminals, 256-color terminals, or both depends on the 'Y.Radiant'.
 fore :: Y.Radiant -> Y.Chunk -> Y.Chunk
 fore (Y.Radiant c8 c256) c = c & Y.scheme . Y.style8 . Y.fore .~ c8
   & Y.scheme . Y.style256 . Y.fore .~ c256
 
 -- | Change the background color.  Whether this affects 8-color
--- terminals, 256-color terminals, or both depends on the 'Radiant'.
+-- terminals, 256-color terminals, or both depends on the 'Y.Radiant'.
 back :: Y.Radiant -> Y.Chunk -> Y.Chunk
 back (Y.Radiant c8 c256) c = c & Y.scheme . Y.style8 . Y.back .~ c8
   & Y.scheme . Y.style256 . Y.back .~ c256
@@ -235,7 +235,7 @@ back (Y.Radiant c8 c256) c = c & Y.scheme . Y.style8 . Y.back .~ c8
 -- red on a 256-color terminal:
 --
 -- @
--- 'T.putChunkLn' $ 'chunk' \"Blue on 8, red on 256" &
+-- 'T.putChunkLn' $ \"Blue on 8, red on 256\" &
 --    'fore' ('blue' <> 'only256' 'red')
 -- @
 only256 :: Y.Radiant -> Y.Radiant
@@ -338,10 +338,10 @@ The 256 color capability is not in ISO 6429, but it is widely supported.
 Probably the most common so-called terminals in use today that do NOT
 support the ISO 6429 codes are those that are not really terminals.
 For instance, you might use an Emacs shell buffer.  For those
-situations just use 'toByteStringsColors0'.
+situations just use 'T.toByteStringsColors0'.
 
-I also decided to standardize on UTF-8 for the 'Text' output.  These
-days that seems reasonable.
+I also decided to standardize on UTF-8 for the 'Data.Text.Text'
+output.  These days that seems reasonable.
 
 Now, to figure out how many colors the terminal supports, Rainbow
 simply uses the @tput@ program.  This removes the dependency on

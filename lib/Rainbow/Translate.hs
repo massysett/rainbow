@@ -336,7 +336,6 @@ putChunks = hPutChunks IO.stdout
 -- First uses 'byteStringMakerFromEnvironment' to determine how many
 -- colors to use.  Then creates a list of 'ByteString' using
 -- 'chunksToByteStrings' and then writes them to standard output.
--- Quick and dirty I/O functions
 putChunksLn :: [T.Chunk] -> IO ()
 putChunksLn cks = do
   putChunks cks
