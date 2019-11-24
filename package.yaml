@@ -45,19 +45,4 @@ tests:
     source-dirs: tests
     dependencies:
       - QuickCheck
-  test8color:
-    dependencies:
-      - QuickCheck
-    main: test8color.hs
-    source-dirs: tests
-  test256color:
-    dependencies:
-      - QuickCheck
-    main: test256color.hs
-    source-dirs: tests
-  colorTest:
-    dependencies:
-      - QuickCheck
-    main: colorTest.hs
-    source-dirs: tests
 
