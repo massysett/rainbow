@@ -4,10 +4,10 @@
 name: rainbow
 synopsis: Print text to terminal with colors and effects
 description: Please see README.md
-version: 0.34.0.0
+version: 0.34.2.0
 license: BSD3
 license-file: LICENSE
-copyright: Copyright 2013-2018 Omari Norman
+copyright: Copyright 2013-2019 Omari Norman
 author: Omari Norman
 maintainer: omari@smileystation.com
 stability: Experimental
@@ -17,6 +17,8 @@ category: System
 extra-source-files:
   - README.md
   - stack.yaml
+verbatim:
+  x-curation: uncurated
 
 dependencies:
   - base >= 4.11 && < 5
@@ -35,6 +37,11 @@ library: {}
 tests:
   rainbow-instances:
     main: rainbow-instances.hs
+    source-dirs: tests
+    dependencies:
+      - QuickCheck
+  rainbow-visual:
+    main: rainbow-visual.hs
     source-dirs: tests
     dependencies:
       - QuickCheck

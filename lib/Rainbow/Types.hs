@@ -11,7 +11,7 @@ module Rainbow.Types where
 -- # Imports
 
 import Control.Lens (makeLenses)
-import Data.String
+import Data.String (IsString(..))
 import Data.Text (Text)
 import qualified Data.Text as X
 import Data.Traversable ()

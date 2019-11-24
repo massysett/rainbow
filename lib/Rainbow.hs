@@ -289,6 +289,11 @@ brightCyan = color256 14
 brightWhite :: Y.Radiant
 brightWhite = color256 15
 
+-- | A 'Y.Radiant' for any of the 256 colors available.  Supply the
+-- color number.  Exactly which color you'll get for a given number
+-- is dependent on the terminal; though there seem to be common
+-- defaults, often the user can configure this however she likes.
+-- The resulting 'Y.Radiant' will affect 256-color terminals only.
 color256 :: Word8 -> Y.Radiant
 color256 x = Y.Radiant (Y.Color Nothing) (Y.Color (Just x))
 

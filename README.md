@@ -13,4 +13,8 @@ and Hackage:
 
 http://hackage.haskell.org/package/rainbow
 
+and Stackage:
+
+https://www.stackage.org/package/rainbow
+
 rainbow is licensed under the BSD license; see the LICENSE file.
