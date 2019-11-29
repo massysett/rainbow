@@ -5,7 +5,7 @@
 -- exported from "Rainbow".
 module Rainbow.Translate where
 
-import Control.Exception (try, IOException)
+import Control.Exception (try)
 import Data.ByteString (ByteString)
 import Data.List (intersperse)
 import Data.Text (Text)
@@ -222,16 +222,20 @@ toByteStringsColors256 (T.Chunk (T.Scheme _ s256) yn)
 -- are at least 8 colors available, returns 'toByteStringsColors8'.
 -- Otherwise, returns 'toByteStringsColors0'.
 --
--- If any IO exceptions arise during this process, they are discarded
--- and 'toByteStringsColors0' is returned.
---
+-- If the terminfo database could not be read (that is, if
+-- 'System.Console.Terminfo.Base.SetupTermError' is returned), then return
+-- 'toByteStringsColors0'.
 byteStringMakerFromEnvironment
   :: IO (T.Chunk -> [ByteString] -> [ByteString])
 byteStringMakerFromEnvironment = fmap g (try Terminfo.setupTermFromEnv)
   where
     g (Left e) = toByteStringsColors0
       where
-        _types = e :: IOException
+        -- Previously this caught all IOException.  Now it catches only SetupTermError.
+        -- See
+        -- https://github.com/commercialhaskell/stackage/issues/4994
+        -- Hopefully this will fix this Stackage bug.
+        _types = e :: Terminfo.SetupTermError
     g (Right terminal) =
       case Terminfo.getCapability terminal (Terminfo.tiGetNum "colors") of
         Nothing -> toByteStringsColors0
