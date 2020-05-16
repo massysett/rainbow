@@ -5,16 +5,20 @@ terminals.  It works only on Unix-like operating systems.  For more
 information, please see the documentation in the main Rainbow
 module.
 
-rainbow is on Github:
+## Get rainbow
+
+### GitHub
 
 http://www.github.com/massysett/rainbow
 
-and Hackage:
+### Hackage
 
 http://hackage.haskell.org/package/rainbow
 
-and Stackage:
+### Stackage
 
 https://www.stackage.org/package/rainbow
+
+## License
 
 rainbow is licensed under the BSD license; see the LICENSE file.
